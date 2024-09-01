@@ -1,8 +1,8 @@
 
 formatter: markdown
 
-header-from: header.md
-footer-from: footer.md
+header-from: README.header.md
+footer-from: README.footer.md
 
 sections:
   #hide: [footer, header]
