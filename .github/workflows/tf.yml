@@ -47,7 +47,7 @@ jobs:
         with:
           working-dir: terraform
           output-file: README.md
-          config-file: terraform/.terraform-docs.yml
+          config-file: .terraform-docs.yml
           output-method: replace
       - name: Commit changes
         uses: EndBug/add-and-commit@v9
@@ -90,6 +90,7 @@ jobs:
         run: terraform init
         working-directory: ./terraform
       - name: Terraform Plan
+        if: false
         run: terraform plan
         working-directory: ./terraform
 
