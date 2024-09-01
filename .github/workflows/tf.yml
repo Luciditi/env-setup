@@ -53,7 +53,7 @@ jobs:
         uses: EndBug/add-and-commit@v9
         with:
           default_author: github_actions
-          message: `terraform-docs`: update docs
+          message: "`terraform-docs`: update docs"
           add: 'terraform/README.md'
 
   tf-fmt:
