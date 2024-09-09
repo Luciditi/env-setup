@@ -1,0 +1,218 @@
+# Default env-setup playbook vars
+#
+# This YAML contains the list overridable variables in the env-setup playbooks.
+# Copy this file to config.yml and any edited value will be used in place of 
+# its default.
+#
+# USAGE EXAMPLE: replace the default dotfiles with your own.
+# cp default.config.yml config.yml
+# awk '{sub(/dotfiles_repo:.*/,"dotfiles_repo:\"https://github.com/my_github_screenname/dotfiles.git\""); print}' config.yml
+# env-setup
+---
+downloads: ~/.ansible-downloads/
+
+# name: env-setup.01-config ####################################################
+
+# Find dotfiles via $(find . -type f | grep -vE '\.\/\.git\/' | sed -e 's/\.\///g')
+
+# name: geerlingguy.dotfiles
+# https://github.com/geerlingguy/ansible-role-dotfiles
+# @TODO: GET DOTFILES
+pub_dotfiles_repo: git@github.com:Luciditi/env-setup-dotfiles.git
+pub_dotfiles_repo_accept_hostkey: yes
+pub_dotfiles_repo_local_destination: ~/env-setup-dotfiles
+pub_dotfiles_repo_version: main
+pub_dotfiles_files: []
+# any file dir that needs to exist before dotfiles mapping
+# useful when you don't want to keep an entire dir mapped to git
+pub_dotfiles_subdirs: []
+
+# OPTIONAL FOR NON PUBLIC DOTFILES
+# Find dotfiles via $(find . -type f | grep -vE '\.\/\.git\/' | sed -e 's/\.\///g')
+
+# name: geerlingguy.dotfiles
+# https://github.com/geerlingguy/ansible-role-dotfiles
+# @TODO: GET DOTFILES
+prv_dotfiles_repo: git@github.com:Luciditi/env-setup-dotfiles.git
+prv_dotfiles_repo_accept_hostkey: yes
+prv_dotfiles_repo_local_destination: ~/env-setup-prv-dotfiles
+prv_dotfiles_repo_version: main
+prv_dotfiles_files: []
+# any file dir that needs to exist before dotfiles mapping
+# useful when you don't want to keep an entire dir mapped to git
+prv_dotfiles_subdirs: []
+
+# name: env-setup.02-cli #######################################################
+
+# any homebrew taps needed for package(formulae)/cask defined below
+# NOTE: in linux we'll use the the community.general.homebrew* modules
+# name: geerlingguy.mac.homebrew
+# https://github.com/geerlingguy/ansible-collection-mac/tree/master/roles/homebrew
+# @TODO: GET TAPS
+homebrew_taps: []
+
+# @TODO: GET PACKS
+envsetup_homebrew_installed_packages: []
+
+# name: env-setup.03-apps ######################################################
+
+# name: geerlingguy.mac.homebrew
+# https://github.com/geerlingguy/ansible-collection-mac/tree/master/roles/homebrew
+# @TODO: GET CASKS
+envsetup_homebrew_cask_apps: []
+
+# name: geerlingguy.mac.mas
+# https://github.com/geerlingguy/ansible-collection-mac/tree/master/roles/mas
+# @TODO: GET MAS
+mas_installed_apps: []
+
+# @TODO: GET MAS
+mas_uninstalled_apps: []
+
+# NOTE: Will prompt for MAS signin
+mas_email: ""
+mas_password: ""
+
+# name: geerlingguy.mac.dock
+# https://github.com/geerlingguy/ansible-collection-mac/tree/master/roles/dock
+configure_dock: false
+
+# @TODO: GET DOCK
+dockitems_persist: []
+
+# @TODO: GET DOCK
+dockitems_remove: []
+
+# defaults.yml
+# set any install app setting that should be defaulted
+envsetup_apps_macos_settings: []
+envsetup_apps_macos_sudo_settings: []
+
+# open.yml
+# manually open apps to confirm settings or manually adjust
+envsetup_apps_macos_app_open: []
+
+# name: env-setup.04-packages ##################################################
+
+# cargo packages to install
+# @TODO: ls $HOME/.cargo/bin
+cargo_packages: []
+
+# composer plugins to install 
+# @TODO: GET LIST
+composer_plugins: []
+
+# php packages to install
+# @TODO: GET LIST
+composer_packages: []
+
+# go packages to install
+# @TODO: GET LIST
+go_packages: []
+
+# ruby packages to install
+# @TODO: GET LIST
+gem_packages: []
+
+# node packages to install
+# @TODO: GET LIST
+npm_packages: []
+
+# python packages to install
+# @TODO: GET LIST
+pip_packages: []
+
+# name: env-setup.05-repos #####################################################
+
+# a project dir where git repos will be actively worked on
+# @TODO: GET LIST
+git_repo_project_dir: ~/env-setup-git-repos
+git_repo_projects: []
+
+# a vendor dir where git repos will be referenced 
+# @TODO: GET LIST
+git_repo_vendors_dir: ~/env-setup-vendors
+git_repo_vendors: []
+
+# name: env-setup.06-os ########################################################
+
+# system.yml
+# the name of the host machine
+envsetup_os_hostname: ENV-SETUP-NONE
+
+# user.yml
+# URL for the admin user
+envsetup_os_avatar_url: "https://avatars.githubusercontent.com/u/1087111"
+
+# macos.yml
+# macos script (see https://mths.be/macos)
+envsetup_os_macos_config_script: ""
+
+# defaults.yml
+# set any os setting that should be defaulted
+envsetup_os_macos_settings: []
+envsetup_os_macos_sudo_settings: []
+
+# set any os setting that should be defaulted
+envsetup_os_linux_settings: []
+
+# name: env-setup.07-cloud #####################################################
+
+# main.yml
+# The cloud app that should be run to start syncing
+envsetup_cloud_app: ""
+
+# The dir where cloud files reside
+envsetup_cloud_dir: ""
+
+# The dir where os setting should be stored
+envsetup_cloud_backup_dir: ""
+
+# The script to do the os setting backup
+envsetup_cloud_sync_script: "echo 'TODO: ADD SCRIPT'"
+
+# dirs.yml
+# The place for cloud file documents on the cloud file dir (and its hierarchy)
+envsetup_cloud_project_root: ""
+envsetup_cloud_project_list: []
+envsetup_cloud_project_dirs: []
+
+# Where on the local filesystem to symlink to the cloud project dir
+envsetup_cloud_project_symlink: ""
+
+# name: env-setup.08-prefs #####################################################
+
+# dock.yml
+# Dock extras (right side) items that should persist (see geerlingguy.mac.dock)
+# @TODO: GET LIST
+envsetup_prefs_macos_other_dockitems_persist: []
+
+# Dock extras (right side) items that should remove (see geerlingguy.mac.dock)
+# @TODO: GET LIST
+envsetup_prefs_macos_other_dockitems_remove: []
+
+# duti.yml
+# Default handlers for file extensions
+# @TODO: GET LIST
+envsetup_prefs_macos_file_extension_handlers: []
+
+# login.yml
+# Default apps that start on login
+# @TODO: GET LIST
+envsetup_prefs_macos_login_items: []
+
+# defaults.yml
+# set any app setting that should be defaulted
+envsetup_prefs_macos_settings: []
+envsetup_prefs_macos_sudo_settings: []
+
+# open.yml
+# manually open apps to confirm settings or manually adjust
+envsetup_prefs_macos_app_open: []
+
+# name: gantsign.visual-studio-code-extensions
+# https://github.com/gantsign/ansible-role-visual-studio-code-extensions
+# @TODO: GET LIST
+envsetup_prefs_visual_studio_code_extensions: []
+envsetup_prefs_visual_studio_code_extensions_absent: []
+
