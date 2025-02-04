@@ -1,5 +1,5 @@
 name: terraform-checks 
-run-name: "TF: ${{ github.job }}"
+run-name: "TF: test - ${{ github.job }}"
 
 env:
   ENVSETUP_REPO_SSH: ${{ github.event.inputs.repo || 'git@github.com:Luciditi/env-setup.git' }}
