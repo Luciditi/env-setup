@@ -51,6 +51,7 @@ locals {
   # based on Mac dedicated host availability this might need to change.
   default_subnet = 1
   region         = var.region
+  test           = "test"
   common_tags = {
     "Name"        = local.stack_name
     "Environment" = var.environment
