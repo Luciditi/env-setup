@@ -36,8 +36,6 @@
         dotfiles_repo_version: "{{ prv_dotfiles_repo_version }}",
         dotfiles_files: "{{ prv_dotfiles_files }}",
         tags: ["print_action", "prv_dotfiles"] }
-    - { role: nass600.vundle,
-        tags: ["print_action", "vundle"] }
 
   tasks: []
         

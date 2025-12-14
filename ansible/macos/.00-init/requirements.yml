@@ -1,7 +1,6 @@
 ---
 roles:
   - name: geerlingguy.dotfiles
-  - name: nass600.vundle
   - name: elliotweiser.osx-command-line-tools
   - name: gantsign.visual-studio-code-extensions
 

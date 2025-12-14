@@ -31,11 +31,12 @@ pub_dotfiles_files:
   - .macos
   - .notags
   - .p10k.zsh
+  - .plugins.vimrc
   - .shell
   - .vim/colors/solarized.vim
   - .vimrc
-  - .vundle.vimrc
   - .zshrc
+  - .plugins.vimrc
 # any file dir that needs to exist before dotfiles mapping
 # useful when you don't want to keep an entire dir mapped to git
 pub_dotfiles_subdirs: 
