@@ -36,7 +36,6 @@ pub_dotfiles_files:
   - .vim/colors/solarized.vim
   - .vimrc
   - .zshrc
-  - .plugins.vimrc
 # any file dir that needs to exist before dotfiles mapping
 # useful when you don't want to keep an entire dir mapped to git
 pub_dotfiles_subdirs: 
