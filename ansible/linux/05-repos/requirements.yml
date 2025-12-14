@@ -1,7 +1,1 @@
----
-roles:
-  - name: geerlingguy.dotfiles
-  - name: nass600.vundle
-
-collections:
-  - name: community.general
+../.00-init/requirements.yml
