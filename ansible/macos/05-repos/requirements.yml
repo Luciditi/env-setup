@@ -1,8 +1,1 @@
----
-roles:
-  - name: geerlingguy.dotfiles
-  - name: nass600.vundle
-  - name: elliotweiser.osx-command-line-tools
-
-collections:
-  - name: geerlingguy.mac
+../.00-init/requirements.yml
