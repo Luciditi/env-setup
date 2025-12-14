@@ -18,12 +18,16 @@ source "$SCRIPTS_DIR/../_common"
 
 echo -e "${C_HIL}Installing Ansible...${C_RES}"
 
-SUGGEST_PIP=$(if [[ -x "$(command -v pip3)" ]]; then \
-    echo "0"; else echo "${ENVSETUP_SUGGEST_PIP:-1}"; fi)
+if [[ -x "$(command -v brew)" ]]; then
+    brew install ansible
+else
+    SUGGEST_PIP=$(if [[ -x "$(command -v pip3)" ]]; then \
+        echo "0"; else echo "${ENVSETUP_SUGGEST_PIP:-1}"; fi)
 
-if [[ $SUGGEST_PIP == "1" ]]; then
-    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-    python3 get-pip.py --user
-    rm get-pip.py
+    if [[ $SUGGEST_PIP == "1" ]]; then
+        curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+        python3 get-pip.py --user
+        rm get-pip.py
+    fi
+    python3 -m pip install --user ansible
 fi
-python3 -m pip install --user ansible
