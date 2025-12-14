@@ -1,7 +1,6 @@
 ---
 roles:
   - name: geerlingguy.dotfiles
-  - name: nass600.vundle
 
 collections:
   - name: community.general
