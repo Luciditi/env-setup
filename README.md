@@ -1,134 +1,149 @@
 # env-setup
 <img align="right" width="250" src="https://github.com/Luciditi/env-setup/assets/1087111/7ad0d467-384e-483c-8dcd-b63c19d90c3e">
 
-A workstation provisioner powered by [Ansible](https://www.ansible.com/) / [Homebrew](https://brew.sh/) for either macOS or Linux.
+`env-setup` is a workstation provisioner for macOS or Linux. It uses [Ansible](https://www.ansible.com/) and [Homebrew](https://brew.sh/).
 
 ## Quickstart
-Get started with `env-setup`:
 
-1. Init: `bash <(curl -sL jig.io/env-setup)` 
-    - or `brew install luciditi/tap/env-setup` with [Homebrew](https://brew.sh/).
-2. Config: `env-setup -c` 
-    - `none`: You want an **empty** config.
-    - `mini`: You want a **minimum** config.
-    - `default`: You want a **workable default** config.
-    - `most`: You want it **all**.
-    - `custom`: You want a **new** `config.yml` config started. (edit w/ `env-setup -e`)
-3. Run: `env-setup`
+1. Install the tool: `bash <(curl -sL jig.io/env-setup)` 
+    - Or use [Homebrew](https://brew.sh/): `brew install luciditi/tap/env-setup`.
+2. Set the configuration: `env-setup -c` 
+    - `none`: Use an **empty** configuration.
+    - `mini`: Use a **minimum** configuration.
+    - `default`: Use a **workable default** configuration.
+    - `most`: Use **all** features.
+    - `custom`: Create a **new** `config.yml` configuration. Edit this configuration with `env-setup -e`.
+3. Run the tool: `env-setup`
 
 ## Usage
 
 <img align="right" width="250" src="https://github.com/Luciditi/env-setup/assets/1087111/0e6b5b99-477c-49df-b6f3-42e908dffa8a">
 
 ### Init
-The initialize command will verify you have `git` & a SSH key to retrieve this 
-repo. You'll need to allow a new SSH key in [GitHub](https://github.com/settings/keys) 
-if not already set. It will install the tool in your home dir under `env-setup`.
+
+The initialize command makes sure that you have `git` and an SSH key to download this repository. It installs the tool in your home directory under `env-setup`.
+
+If you do not have an SSH key, add a new SSH key in [GitHub](https://github.com/settings/keys).
 <br /><br /><br /><br /><br /><br /><br />
 
 <img align="right" width="250" src="https://github.com/Luciditi/env-setup/assets/1087111/4abc41e2-79b0-4f11-9504-ce9221852d83">
 
 ### Config
-The configuration yml file (`config.yml`) contains a **manifest** of Ansible _variables_ 
-that define **_what should be installed in your environment_**. You can change the 
-values in `config.yml` to fit what your environment setup needs.
 
-`env-setup` has a few starter config templates from these starter scenarios:
-  - `none`: You don't need an environment setup, but you want the `env-setup` tool for later use.
-  - `mini`: You want a environment setup with only the basic functionality (scripts, Homebrew, & Ansible).
-  - `default`: You **workable default** environment setup that will be used semi-often.
-  - `most`: You want it **all** in a environment setup that you'll use often.
-  - `custom`: You want a **custom** `config.yml` that you'll specify on your own (see an [example config.yml](https://gist.github.com/ShawnConn/2400705e601d6315394f0e4f01bb66b8))
+The configuration YAML file (`config.yml`) contains a **manifest** of Ansible _variables_. These variables set **what the system installs in your environment**.
 
-If you need to manually update a `custom` config, use `env-setup -e` to edit it.
+`env-setup` has five starter configuration templates:
+  - `none`: The tool gives no environment setup. It keeps the `env-setup` tool for later use.
+  - `mini`: The tool gives basic features (scripts, Homebrew, and Ansible).
+  - `default`: The tool gives a **workable default** environment setup.
+  - `most`: The tool gives **all** features for a complete environment setup.
+  - `custom`: You specify a **custom** `config.yml` configuration. Read this [example config.yml](https://gist.github.com/ShawnConn/2400705e601d6315394f0e4f01bb66b8).
+
+Change the values in `config.yml` to match the needs of your environment setup. If you must manually update a `custom` configuration, run `env-setup -e` to edit the file.
 <img align="right" width="250" src="https://github.com/Luciditi/env-setup/assets/1087111/7d30e859-b7c6-4f21-b35d-879ae550a4f7">
 
 ### Run
-When `env-setup` is first run it will verify you have Ansible. After that, you'll
-be prompted to select an Ansible _playbook_ to run. Optionally, you can specify
-what playbook to run directly (e.g. `env-setup 01-config` will run the config 
-playbook directly, `env-setup all` will run all playbooks in sequential order)
+
+When you run `env-setup` for the first time, it makes sure that you have Ansible. Then, it prompts you to select an Ansible _playbook_.
+
+To specify a playbook, run the command with the playbook name. To run the configuration playbook, run `env-setup 01-config`. To run all playbooks in sequence, run `env-setup all`.
 <br /><br /><br /><br /><br /><br /><br />
 
 ### Updating
-Running `env-setup -u` will update the installed repo alongside the installed 
-[dotfiles repo](https://github.com/Luciditi/env-setup-dotfiles). 
+
+Run `env-setup -u` to update the installed repository and the installed [dotfiles repository](https://github.com/Luciditi/env-setup-dotfiles).
 
 ### Playbooks
-An Ansible _playbook_ is a series of _tasks_ that need to run to get to your wanted setup.
-`env-setup` has 8 main playbooks with other optional ones based on your needs.
 
-- `01-config`: Configure your [dotfiles](https://dotfiles.github.io/) for your app & CLI configuration (defaults to [env-setup-dotfiles](https://github.com/Luciditi/env-setup-dotfiles) if not overridden)
-- `02-cli`: Install CLI tools via [Homebrew formulas](https://formulae.brew.sh/formula/)
-- `03-apps`: Install GUI applications via [Homebrew casks](https://formulae.brew.sh/cask/) & other means (e.g., Linux package manager & App Store via [mas](https://github.com/mas-cli/mas))
-- `04-packages`: Install common programming language (Go/Node/PHP/Ruby/Rust/Python) dependencies for development tooling.
-- `05-repos`: Clones Git repos used for active development (projects) or reference (vendors).
-- `06-os`: Configure the OS settings.
-- `07-cloud`: Configure the host for cloud file sync.
-- `08-prefs`: Configure any other app settings.
+An Ansible _playbook_ is a series of _tasks_. The tasks run to build your setup. `env-setup` has 8 main playbooks and other optional playbooks.
 
-See **custom playbook** section for adding other playbooks as needed.
+- `01-config`: Configures your [dotfiles](https://dotfiles.github.io/) for your app and CLI configuration. It defaults to [env-setup-dotfiles](https://github.com/Luciditi/env-setup-dotfiles) when not overridden.
+- `02-cli`: Installs CLI tools with [Homebrew formulas](https://formulae.brew.sh/formula/).
+- `03-apps`: Installs GUI applications with [Homebrew casks](https://formulae.brew.sh/cask/). It also uses the Linux package manager and the App Store via [mas](https://github.com/mas-cli/mas).
+- `04-packages`: Installs common programming language dependencies for development tooling. It supports Go, Node, PHP, Ruby, Rust, and Python.
+- `05-repos`: Clones Git repositories for active development projects or reference vendors.
+- `06-os`: Configures the OS settings.
+- `07-cloud`: Configures the host for cloud file sync.
+- `08-prefs`: Configures other app settings.
+
+To add other playbooks, read the **Custom Playbook** section.
 
 ### Task Info
-If you like a _list_ of what _tasks_ in a playbook will do, run `env-setup -i` with 
-the playbook name (e.g. `env-setup -i 03-apps`). It will print an ordered task 
-list, with a description and tags that describe what the playbook will do.
+
+To see a list of tasks in a playbook, run `env-setup -i` with the playbook name. For example, run `env-setup -i 03-apps`.
+
+The tool prints an ordered task list. The list contains a description and tags for each task in the playbook.
 
 ### Skipping Tasks
-If you'd like to _skip_ tasks in a playbook, each task have tags associated 
-with them. You can **select tags** with the `-t` option or **skip tags** with the `-s` 
-option. You can specify multiple tags by comma-delimiting. For example:
 
-- `env-setup -t node,python 04-packages`: Install only **Node & Python** packages.
-- `env-setup -s php 04-packages`: Install all packages, except **PHP** packages.
+Each task has associated tags.
 
-### Environment Variable Overrides 
-There are a few environment variables that can be overridden to change behavior:
+To select tags, use the `-t` option. To skip tags, use the `-s` option. To specify multiple tags, separate them with a comma.
 
-- **Init:**
-    - `ENVSETUP_INTERACT`: enable interactive prompts during init (default `1`)
-    - `ENVSETUP_KEY_FILE`: the SSH key path created during init (default: `$HOME/.ssh/id_rsa`)
-    - `ENVSETUP_KEY_FILE_COMMENT`: the SSH key comment created during init (default: `env-setup:$USER@$(hostname)`)
-    - `ENVSETUP_INSTALL_DIR`: the path to install env-setup during init (default: `$HOME/env-setup`)
-- **RunTime:**
-    - `ENVSETUP_INSTALL_DIR`: the path where env-setup looks for its config.yml files (default: `$HOME/env-setup`)
-    - `ANSIBLE_SUDO`: env-setup runs ansible w/ a sudo prompt, set to `-n` to disable (default: `-K`)
-    - `ANSIBLE_CHECK`: env-setup runs ansible w/ a dry-run check, set to `-C` to enable (default: ``)
-    - `ANSIBLE_STDOUT_CALLBACK`: env-setup runs ansible w/ a differ status update, set one of these options: `unixy | dense | debug | yaml | selective` (default: `unixy`)
-    - `ANSIBLE_PLAYBOOK_INFO`: env-setup runs ansible w/ a display of playbook steps, set to `--list-tasks` to enable (default: ``)
-    - `ANSIBLE_SKIPPED_TAGS`: env-setup runs ansible w/ skipping tags, set to a comma-delimited list of tags to skip (default: ``)
-    - `ANSIBLE_TAGS`: env-setup runs ansible w/ specific tags, set to a comma-delimited list of tags to run (default: ``)
-    - `ANSIBLE_VERBOSE`: env-setup runs ansible w/ verbosity, set to `-vvv` to enable (default: ``)
+For example:
+- To install only **Node and Python** packages, run `env-setup -t node,python 04-packages`.
+- To install all packages except **PHP** packages, run `env-setup -s php 04-packages`.
+
+### Environment Variable Overrides
+
+You can override these environment variables to change behavior.
+
+**Init:**
+- `ENVSETUP_INTERACT`: Enables interactive prompts during initialization. The default is `1`.
+- `ENVSETUP_KEY_FILE`: Sets the SSH key path that the tool creates during initialization. The default is `$HOME/.ssh/id_rsa`.
+- `ENVSETUP_KEY_FILE_COMMENT`: Sets the SSH key comment that the tool creates during initialization. The default is `env-setup:$USER@$(hostname)`.
+- `ENVSETUP_INSTALL_DIR`: Sets the path to install `env-setup` during initialization. The default is `$HOME/env-setup`.
+
+**RunTime:**
+- `ENVSETUP_INSTALL_DIR`: Sets the path where `env-setup` looks for its `config.yml` files. The default is `$HOME/env-setup`.
+- `ANSIBLE_SUDO`: `env-setup` runs Ansible with a sudo prompt (`-K` by default). A value of `-n` disables the prompt.
+- `ANSIBLE_CHECK`: `env-setup` runs Ansible with a dry-run check. A value of `-C` enables the check.
+- `ANSIBLE_STDOUT_CALLBACK`: `env-setup` runs Ansible with a different status update. The options are `unixy`, `dense`, `debug`, `yaml`, or `selective`. The default is `unixy`.
+- `ANSIBLE_PLAYBOOK_INFO`: `env-setup` runs Ansible with a display of playbook steps. A value of `--list-tasks` enables the display.
+- `ANSIBLE_SKIPPED_TAGS`: `env-setup` runs Ansible and skips specified tags. The value is a comma-delimited list of tags.
+- `ANSIBLE_TAGS`: `env-setup` runs Ansible and runs specific tags. The value is a comma-delimited list of tags.
+- `ANSIBLE_VERBOSE`: `env-setup` runs Ansible with verbosity. A value of `-vvv` enables verbosity.
 
 ## Testing
-If you'd like to have a environment for testing deployment, `env-setup` has a 
-couple of scripts/tools that can help setup an environment:
 
-- The `docker` [directory](docker) contains a `Dockerfile` that can be used to build a Ubuntu Linux docker image with `env-setup` installed w/ all the playbooks. 
-    - Pre-built images can be found on [ghcr.io/luciditi/env-setup](https://github.com/Luciditi/env-setup/tree/main/docker#hosted-images). 
-    - If you want a quick one-liner to test, `source <(curl -sL jig.io/dev-aliases) && dev-env` will setup an alias for `docker run ... ghcr.io/luciditi/env-setup`
-- The `terraform` [directory](terraform) is a basic Terraform module that can stand up a SSH key and EC2 VMs (Linux (Ubuntu 20) & macOS (Sonoma)). 
-    - Once built, there are a few [scripts](terraform/scripts) that can be used to test `env-setup` in the new VMs.
-- The `vm` [directory](vm) has a couple of [scripts](vm/scripts) that can stand up Linux (Ubuntu) & macOS (Sonoma) VMs in [Tart](https://tart.run/). 
-    - Run `eval "$(env-setup -A)"` to create `env-vm-*` aliases:
-    - Run `env-vm-create` to create a new VM
-    - Run `env-vm-start` to run the VM
-    - Run `env-vm-init` to initialize the VM with `env-setup`
-    - Run `env-vm-ssh` to shell into the VM
-    - Run `env-vm-env-setup` to run `env-setup` inside the VM
-    - Run `env-vm-stop` to stop the VM
+`env-setup` has tools to install an environment for testing.
+
+### Docker
+
+The `docker` [directory](docker) contains a `Dockerfile`. The `Dockerfile` builds an Ubuntu Linux docker image with `env-setup` and all playbooks.
+
+You can find pre-built images on [ghcr.io/luciditi/env-setup](https://github.com/Luciditi/env-setup/tree/main/docker#hosted-images). 
+
+To test with a quick command, run `source <(curl -sL jig.io/dev-aliases) && dev-env`. This command installs an alias for `docker run ... ghcr.io/luciditi/env-setup`.
+
+### Terraform
+
+The `terraform` [directory](terraform) is a Terraform module. The module builds an SSH key and EC2 VMs for Linux (Ubuntu 20) and macOS (Sonoma). 
+
+After you build the VMs, use the [scripts](terraform/scripts) to test `env-setup` in the new VMs.
+
+### VMs in Tart
+
+The `vm` [directory](vm) has [scripts](vm/scripts) to build Linux (Ubuntu) and macOS (Sonoma) VMs in [Tart](https://tart.run/). 
+
+To use these scripts, do these steps:
+1. Run `eval "$(env-setup -A)"` to create `env-vm-*` aliases.
+2. Run `env-vm-create` to create a new VM.
+3. Run `env-vm-start` to start the VM.
+4. Run `env-vm-init` to initialize the VM with `env-setup`.
+5. Run `env-vm-ssh` to open a shell in the VM.
+6. Run `env-vm-env-setup` to run `env-setup` in the VM.
+7. Run `env-vm-stop` to stop the VM.
 
 ## Custom Playbook
-To get started with a custom playbook: 
 
-- run `./scripts/add-playbook 09-my-playbook`
+To create a custom playbook, run `./scripts/add-playbook 09-my-playbook`.
 
-This will setup the directory structure in the `ansible` dir and make it 
-selectable in the `env-setup` tool.
+This command builds the directory structure in the `ansible` directory. The new playbook is selectable in the `env-setup` tool.
 
-From there, you can edit:
-- `ansible/*/09-my-playbook/main.yml` to add your playbook tasks
-- `ansible/*/09-my-playbook/requirements.yml` to add any ansible-galaxy dependencies for the playbook.
+To add your playbook tasks, edit `ansible/*/09-my-playbook/main.yml`. 
+To add ansible-galaxy dependencies, edit `ansible/*/09-my-playbook/requirements.yml`.
 
 ## Development
-See the development [README](DEV-README.md).
+
+Read the development [README](DEV-README.md).
