@@ -46,7 +46,8 @@ printline() {
 }
 
 #  Logging functions
-readonly LOG_FILE="/tmp/$(basename "$0").log"
+LOG_FILE="/tmp/$(basename "$0").log"
+readonly LOG_FILE
 info()    { echo -e "[INFO]    $*" | tee -a "$LOG_FILE" >&2 ; }
 warning() { echo -e "[WARNING] $*" | tee -a "$LOG_FILE" >&2 ; }
 error()   { echo -e "[ERROR]   $*" | tee -a "$LOG_FILE" >&2 ; }
@@ -78,7 +79,6 @@ ENVSETUP_KEY_FILE=${ENVSETUP_KEY_FILE:-"$HOME/.ssh/id_rsa"}
 ENVSETUP_ID="env-setup:$USER@$(hostname)"
 ENVSETUP_KEY_FILE_COMMENT=${ENVSETUP_KEY_FILE_COMMENT:-"$ENVSETUP_ID"}
 INSTALL_DIR=${ENVSETUP_INSTALL_DIR:-"$HOME/env-setup"}
-TMP_CLI_FILE="/tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress;"
 
 ##}}}#######################################################################
 
@@ -97,7 +97,7 @@ expr "$*" : ".*--help" > /dev/null && usage
 # Add options x: - required arg
 while getopts 'h' FLAG; do
     case "${FLAG}" in
-        h) usage; exit 0 ;;
+        h) usage ;;
         *) : ;;
     esac
 done
