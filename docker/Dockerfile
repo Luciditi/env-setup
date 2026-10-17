@@ -1,14 +1,34 @@
 # syntax=docker/dockerfile:1
-ARG VER=20.04
+#
+# Ubuntu 24.04 (noble) is REQUIRED, not cosmetic.
+#
+# Homebrew compares the host glibc/libstdc++ against its CI baseline:
+#   LINUX_GLIBC_CI_VERSION     = 2.39   (Homebrew/os.rb)
+#   LINUX_LIBSTDCXX_CI_VERSION = 6.0.33
+# When the host is below either floor, `needs_libc_formula?` and
+# `needs_compiler_formula?` both flip true and Homebrew injects
+# source builds of glibc AND gcc into every dependency chain.
+#
+# Ubuntu 20.04 ships glibc 2.31 / libstdc++ 6.0.28 -- below both. That is why
+# every config with a non-empty package list used to build for hours and time
+# out at the 6h job cap, while `.none` (empty list) passed in ~5 minutes.
+# Ubuntu 24.04 ships glibc 2.39 / libstdc++ 6.0.33 and clears both exactly.
+ARG VER=24.04
 
 FROM ubuntu:${VER} AS deps
 ENV USER=user
 ARG PASS=password
-ENV TZ=US \
+# TZ was "US", which is not a valid zone name.
+ENV TZ=Etc/UTC \
     DEBIAN_FRONTEND=noninteractive
+# Without these, each serial `brew install` triggers a full homebrew-core
+# `git fetch` before doing any work.
+ENV HOMEBREW_NO_AUTO_UPDATE=1 \
+    HOMEBREW_NO_INSTALL_CLEANUP=1 \
+    HOMEBREW_NO_ANALYTICS=1 \
+    HOMEBREW_NO_ENV_HINTS=1
 RUN apt-get update \
   && apt-get install -y software-properties-common \
-  && add-apt-repository --yes "deb http://archive.ubuntu.com/ubuntu $(lsb_release -sc) main" \
   && apt-get install -y \
     build-essential \
     curl \
