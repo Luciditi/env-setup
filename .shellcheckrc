@@ -1,0 +1,5 @@
+# ShellCheck Configuration
+external-sources=true
+source-path=SCRIPTDIR:.
+enable=check-unassigned-uppercase
+disable=SC2250,SC2312,SC2292

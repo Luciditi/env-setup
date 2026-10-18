@@ -5,7 +5,7 @@ set -euo pipefail
 #set -vx
 
 SCRIPTS_DIR="$(dirname "$0")"
-# shellcheck source=/dev/null
+# shellcheck source=scripts/_common
 source "$SCRIPTS_DIR/../../scripts/_common"
 BOOTSTAP_URL=${1:-""}
 

@@ -264,10 +264,6 @@ envsetup_os_hostname: ENV-SETUP
 # URL for the admin user
 envsetup_os_avatar_url: "https://avatars.githubusercontent.com/u/16793781"
 
-# macos script (see https://mths.be/macos)
-envsetup_os_macos_settings: []
-envsetup_os_macos_sudo_settings: []
-
 # macos.yml
 # macos script (see https://mths.be/macos)
 envsetup_os_macos_config_script: "{{ pub_dotfiles_repo_local_destination }}/.macos"

@@ -1,0 +1,23 @@
+---
+extends: default
+
+rules:
+  key-duplicates: enable
+  document-start: disable
+  line-length:
+    max: 160
+    level: warning
+  truthy:
+    level: warning
+  octal-values:
+    level: warning
+  trailing-spaces:
+    level: warning
+  comments:
+    level: warning
+  braces:
+    level: warning
+  brackets:
+    level: warning
+  colons:
+    level: warning

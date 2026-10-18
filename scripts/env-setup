@@ -249,7 +249,7 @@ run_playbook() {
 #/          -v: Run env-setup with verbose mode
 SCRIPT=$(basename "$0")
 SCRIPTS_DIR="$(dirname "$0")"
-# shellcheck source=/dev/null
+# shellcheck source=scripts/_common
 source "$SCRIPTS_DIR/_common"
 usage() {
     grep '^#/' "$0" | cut -c4- | sed -e "s/\$SCRIPT/$SCRIPT/g" ; exit 0 ;

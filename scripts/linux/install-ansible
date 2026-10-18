@@ -9,7 +9,7 @@ set -euo pipefail
 ############################################################################
 
 SCRIPTS_DIR="$(dirname "$0")"
-# shellcheck source=/dev/null
+# shellcheck source=scripts/_common
 source "$SCRIPTS_DIR/../_common"
 
 ############################################################################

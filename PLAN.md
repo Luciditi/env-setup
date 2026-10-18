@@ -26,7 +26,7 @@ beads (`bd ready`, `bd show <id>`).
 | PR | Scope | Issue | State |
 |----|-------|-------|-------|
 | 1 | Foundation fixes (`_common`, 7 bugs) | `env-setup-8k5` | **done** |
-| 2 | Lint configs in CI | `env-setup-8gz` | ready |
+| 2 | Lint configs in CI | `env-setup-8gz` | **done** |
 | 3 | 24.04 + `HOMEBREW_NO_*` + matrix | `env-setup-jpu` | **done** |
 | 4 | Testability refactor + bats | `env-setup-6tw` | ready |
 | 5 | `vm` subcommands + `_vm`/`_remote` | `env-setup-4dd` | ready |
@@ -40,10 +40,12 @@ beads (`bd ready`, `bd show <id>`).
 ### Uncommitted changes so far
 
 ```
-scripts/_common       scripts/env-setup     scripts/add-playbook
-scripts/init          scripts/aliases       docker/Dockerfile
-.github/workflows/deploy-image.yml          .claude/settings.json
-PLAN.md
+.shellcheckrc             .yamllint.yml             .ansible-lint
+.pre-commit-config.yaml   .github/workflows/lint.yml
+default.config.yml        scripts/aliases           scripts/add-playbook
+scripts/env-setup         scripts/linux/install-ansible
+scripts/macos/install-ansible                       terraform/scripts/* (9)
+vm/scripts/* (7)          PLAN.md
 ```
 
 ---
@@ -116,42 +118,28 @@ like `.most` (32) — the failure never scaled with package count.
 Matrix planning simulated across all 8 trigger paths; all emit valid JSON and the
 bogus-config path fails fast.
 
-**Not yet validated:** no CI run has executed. First action on resume should be
-`gh workflow run deploy-image.yml -f config=docker/.mini.config.yml -f version=0.0.0-test`
-and confirm it completes in ≤8 min. That is the empirical proof the 6h burn is fixed.
+**Validated:** GitHub Actions workflow run `39089855401` ran against `v3` (`mini`
+config, `version=0.0.0-test`) and completed with `success` in 13m17s (initial cold
+build, with `buildcache-mini` pushed to GHCR for fast subsequent runs). The 6h burn
+is empirically confirmed fixed.
+
+## Done — PR 2 (`env-setup-8gz`)
+
+- Landed `.shellcheckrc` with `external-sources=true`, `source-path=SCRIPTDIR:.`,
+  `enable=check-unassigned-uppercase`, and `disable=SC2250,SC2312,SC2292`.
+- Replaced all 19 inline `# shellcheck source=/dev/null` directives across `scripts/`,
+  `terraform/scripts/`, and `vm/scripts/` with `# shellcheck source=scripts/_common`.
+- Added `# shellcheck disable=SC2154` to `scripts/aliases` for exported shell variables.
+  **ShellCheck now runs 100% clean across all 24 shell scripts.**
+- Fixed `default.config.yml` duplicate empty key definitions at lines 268-269.
+- Added `.yamllint.yml` with `key-duplicates: error` and warn-only legacy styling rules.
+- Added `.ansible-lint` (`profile: min`).
+- Added `.pre-commit-config.yaml` supporting both `prek` and `pre-commit` for local git hooks.
+- Added `.github/workflows/lint.yml` to enforce ShellCheck, yamllint, and ansible-lint in CI.
 
 ---
 
 ## Next up
-
-### PR 2 — lint in CI (`env-setup-8gz`), independent, small
-
-shellcheck already passes clean. Land `.shellcheckrc` with `external-sources=true`,
-`source-path=SCRIPTDIR`, `enable=check-unassigned-uppercase` (SC2154 — the class
-that caught `$SUGGEST_ANSIBLE`), and `disable=SC2250,SC2312,SC2292` (261+37+14
-style findings; ratchet later).
-
-**Critical:** the 19 inline `# shellcheck source=/dev/null` annotations *defeat*
-`external-sources` and produce 56 false SC2154s. Replace with
-`# shellcheck source=scripts/_common`.
-
-Discovery is shebang-based (`git grep -lIz -E '^#!(/usr/bin/env bash|/bin/bash)'`)
-since scripts have no `.sh` extension; `scripts/aliases` already carries a
-`# shellcheck shell=bash` directive (added in PR 1).
-
-yamllint: land warn-only first. Expect failures on widespread trailing whitespace,
-`truthy` (`become: yes`), `octal-values` (`mode: 0440`), and missing
-`document-start`. `key-duplicates` catches a **real bug**: `default.config.yml`
-defines `envsetup_os_macos_settings` and `..._sudo_settings` at lines 268-269 then
-redefines both at 276/278 — the first pair is silently discarded.
-
-ansible-lint at `profile: min`. **Blocker:** `vars_files: ../../../default.config.yml`
-is playbook-dir-relative and `run_playbook()` `cd`s there first, so running from
-the repo root fails `load-failure` on all 18 playbooks. Drive per-directory,
-naming `.00-init` explicitly (ansible-lint skips hidden paths).
-
-Neither `yamllint` nor `ansible-lint` is installed locally (`ansible-lint` is at
-`~/.local/bin`). `bats`, `shellcheck`, `tart` 2.30.0, `sshpass` are present.
 
 ### PR 4 — testability + bats (`env-setup-6tw`)
 
