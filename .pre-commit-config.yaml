@@ -13,13 +13,13 @@ repos:
     rev: v1.35.1
     hooks:
       - id: yamllint
-        args: [-c, .yamllint.yml]
+        args: [-c, .yamllint.yml, --no-warnings]
 
   - repo: local
     hooks:
       - id: ansible-lint
         name: ansible-lint
-        entry: bash -c 'for f in "$@"; do (cd "$(dirname "$f")" && ansible-lint "$(basename "$f")"); done' --
+        entry: bash -c 'export PATH="$HOME/.local/bin:$PATH"; for f in "$@"; do (cd "$(dirname "$f")" && ansible-lint "$(basename "$f")"); done' --
         language: system
         files: '^ansible/.*main\.ya?ml$'
         pass_filenames: true

@@ -1,34 +1,6 @@
 #!/usr/bin/env bash
-
-# Set stop on error / enable debug
 set -euo pipefail
-#set -vx
 
-SCRIPTS_DIR="$(dirname "$0")"
-# shellcheck source=scripts/_common
-source "$SCRIPTS_DIR/../../scripts/_common"
-
-############################################################################
-# TEST ENV-SETUP
-############################################################################
-
-if [[ ! -x "$(command -v tart)" ]]; then
-    echo -e "\n${C_ERR}tart is required!${C_RES}"
-    echo -e "\nrun ${C_WAR}brew install cirruslabs/cli/tart${C_RES}"
-    exit 1
-fi
-
-if [[ ! -x "$(command -v sshpass)" ]]; then
-    echo -e "\n${C_ERR}sshpass is required!${C_RES}"
-    echo -e "\nrun ${C_WAR}brew install cirruslabs/cli/sshpass${C_RES}"
-    exit 1
-fi
-
-HOST_INFO=$(tart list | grep --color=none running | tr -s ' ' | cut -d' ' -f2)
-SSH_HOST=$(tart ip "$HOST_INFO")
-SSH_USER="admin"
-SSH_OPT="StrictHostKeyChecking no"
-
-echo -e "\n${C_HIL}Running env-setup $* test on $SSH_HOST:${C_RES}"
-sshpass -p admin ssh -o "$SSH_OPT" "$SSH_USER"@"$SSH_HOST" \
-    "export ENVSETUP_INTERACT=0 && ./env-setup/scripts/env-setup $*"
+SCRIPTS_DIR="$(dirname "${BASH_SOURCE[0]}")"
+echo -e "[WARNING] vm/scripts/env-setup is deprecated; use 'scripts/vm/env-setup' or 'env-setup vm env-setup' instead." >&2
+exec "$SCRIPTS_DIR/../../scripts/vm/env-setup" "$@"

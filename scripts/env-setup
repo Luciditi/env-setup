@@ -219,6 +219,8 @@ run_playbook() {
 #/      Start $SCRIPT to select playbooks to setup.
 #/   $SCRIPT -A
 #/      Generate aliases to be sourced with "eval "$(env-setup -A)
+#/   $SCRIPT vm <subcommand>
+#/      Run a vm subcommand (create, start, stop, status, ssh, scp, env-setup, init)
 #/   $SCRIPT -c
 #/      Set a new config.
 #/   $SCRIPT -C 02-cli
@@ -235,6 +237,9 @@ run_playbook() {
 #/      Run "03-apps" playbook in verbose mode.
 #/   $SCRIPT 04-my-playbook
 #/      Have $SCRIPT run the "04-my-playbook" playbook.
+#/
+#/ Subcommands:
+#/   vm <subcommand>: Tart VM management (create, start, stop, status, ssh, scp, env-setup, init)
 #/
 #/ Options:
 #/   --help/-h: Display this help message
@@ -256,6 +261,22 @@ usage() {
     grep '^#/' "${BASH_SOURCE[0]}" | cut -c4- | sed -e "s/\$SCRIPT/$SCRIPT/g" ; exit 0 ;
 }
 
+vm_usage() {
+    cat << EOF
+Usage: $SCRIPT vm <subcommand> [args...]
+
+Subcommands:
+  create [macos|linux|all]     Create Tart VMs
+  start <vm-name>              Start a Tart VM
+  stop <vm-name>               Stop a Tart VM
+  status [vm-name]             Show status of Tart VMs
+  ssh [vm-name] [cmd...]       SSH to a Tart VM
+  scp [vm-name] <src> <dst>    SCP to/from a Tart VM
+  env-setup [vm-name] [args]   Run env-setup inside a Tart VM
+  init [vm-name] <url>         Run bootstrap init script inside a Tart VM
+EOF
+}
+
 parse_flags() {
     expr "$*" : ".*--help" > /dev/null && usage
 
@@ -264,13 +285,14 @@ parse_flags() {
         # shellcheck disable=SC2317
         case "${FLAG}" in
             A)
-                echo "alias env-vm-create=\"$INSTALL_DIR/vm/scripts/create\""
-                echo "alias env-vm-env-setup=\"$INSTALL_DIR/vm/scripts/env-setup\""
-                echo "alias env-vm-init=\"$INSTALL_DIR/vm/scripts/init\""
-                echo "alias env-vm-scp=\"$INSTALL_DIR/vm/scripts/scp\""
-                echo "alias env-vm-ssh=\"$INSTALL_DIR/vm/scripts/ssh\""
-                echo "alias env-vm-start=\"$INSTALL_DIR/vm/scripts/start\""
-                echo "alias env-vm-stop=\"$INSTALL_DIR/vm/scripts/stop\""
+                echo "alias env-vm-create=\"$INSTALL_DIR/scripts/vm/create\""
+                echo "alias env-vm-env-setup=\"$INSTALL_DIR/scripts/vm/env-setup\""
+                echo "alias env-vm-init=\"$INSTALL_DIR/scripts/vm/init\""
+                echo "alias env-vm-scp=\"$INSTALL_DIR/scripts/vm/scp\""
+                echo "alias env-vm-ssh=\"$INSTALL_DIR/scripts/vm/ssh\""
+                echo "alias env-vm-start=\"$INSTALL_DIR/scripts/vm/start\""
+                echo "alias env-vm-stop=\"$INSTALL_DIR/scripts/vm/stop\""
+                echo "Warning: env-vm-* aliases are deprecated; use 'env-setup vm <subcommand>' instead." >&2
                 exit 0
                 ;;
             c) shift "$((OPTIND-1))"; config "${1:-""}"; exit 0 ;;
@@ -300,10 +322,31 @@ parse_flags() {
     done
     shift "$((OPTIND-1))"
     PLAYBOOK="${1:-""}"
+    if [[ $# -gt 1 ]]; then
+        EXTRA_ARGS=("${@:2}")
+    else
+        EXTRA_ARGS=()
+    fi
 }
 
 main() {
     parse_flags "$@"
+
+    if [[ "$PLAYBOOK" == "vm" ]]; then
+        local vm_cmd="${EXTRA_ARGS[0]:-""}"
+        if [[ -z "$vm_cmd" || "$vm_cmd" == "-h" || "$vm_cmd" == "--help" ]]; then
+            vm_usage
+            exit 0
+        fi
+        local vm_script="$SCRIPTS_DIR/vm/$vm_cmd"
+        if [[ -x "$vm_script" ]]; then
+            exec "$vm_script" "${EXTRA_ARGS[@]:1}"
+        else
+            echo -e "${C_ERR}Unknown vm subcommand: $vm_cmd${C_RES}\n" >&2
+            vm_usage >&2
+            exit 1
+        fi
+    fi
 
     ANSIBLE_SUDO=${ANSIBLE_SUDO-"-K"}
     ANSIBLE_CHECK=${ANSIBLE_CHECK:-""}

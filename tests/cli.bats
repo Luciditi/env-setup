@@ -19,6 +19,35 @@ load test_helper
     [ "$status" -eq 0 ]
     [[ "$output" =~ "alias env-vm-create=" ]]
     [[ "$output" =~ "alias env-vm-ssh=" ]]
+    [[ "$output" =~ "scripts/vm/create" ]]
+    [[ "$output" =~ "deprecated" ]]
+}
+
+@test "env-setup vm prints usage when no subcommand provided" {
+    run "$REPO_ROOT/scripts/env-setup" vm
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Usage:" ]]
+    [[ "$output" =~ "vm <subcommand>" ]]
+}
+
+@test "env-setup vm dispatches to scripts/vm/<subcommand>" {
+    make_stub "tart" '
+        if [[ "$1" == "list" ]]; then
+            echo '\''[{"Name":"es-test","State":"stopped"}]'\''
+            exit 0
+        fi
+        echo "tart $@" >> "$TEST_TMP/tart.calls"
+    '
+    run "$REPO_ROOT/scripts/env-setup" vm start "es-test"
+    [ "$status" -eq 0 ]
+    run cat "$TEST_TMP/tart.calls"
+    [[ "$output" =~ "tart run --vnc es-test" ]]
+}
+
+@test "env-setup vm fails on unknown subcommand" {
+    run "$REPO_ROOT/scripts/env-setup" vm unknown-subcmd
+    [ "$status" -ne 0 ]
+    [[ "$output" =~ "Unknown vm subcommand" ]]
 }
 
 @test "env-setup -e fails with code 1 when EDITOR is unset" {

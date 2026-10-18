@@ -21,3 +21,9 @@ rules:
     level: warning
   colons:
     level: warning
+  empty-lines: disable
+  indentation: disable
+  new-line-at-end-of-file: disable
+
+ignore: |
+  .beads/

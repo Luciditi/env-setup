@@ -37,3 +37,13 @@ EOF
     # Prepend stub bin to PATH
     export PATH="$TEST_TMP/bin:$PATH"
 }
+
+make_stub() {
+    local name="$1"
+    local body="$2"
+    cat << EOF > "$TEST_TMP/bin/$name"
+#!/usr/bin/env bash
+$body
+EOF
+    chmod +x "$TEST_TMP/bin/$name"
+}

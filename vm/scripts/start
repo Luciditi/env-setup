@@ -1,32 +1,6 @@
 #!/usr/bin/env bash
-
-# Set stop on error / enable debug
 set -euo pipefail
-#set -vx
 
-SCRIPTS_DIR="$(dirname "$0")"
-# shellcheck source=scripts/_common
-source "$SCRIPTS_DIR/../../scripts/_common"
-
-############################################################################
-# START TART VM
-############################################################################
-
-VM_NAME=${1:-""}
-
-if [[ -z "$VM_NAME" ]]; then
-    echo -e "usage: ($TART_MACOS_NAME|$TART_LINUX_NAME)"
-    exit 1
-fi
-
-if [[ ! -x "$(command -v tart)" ]]; then
-    echo -e "\n${C_ERR}tart is required!${C_RES}"
-    echo -e "\nrun ${C_WAR}brew install cirruslabs/cli/tart${C_RES}"
-    exit 1
-fi
-
-echo -e "\n${C_HIL}Looking for $VM_NAME:${C_RES}"
-tart get "$VM_NAME"
-
-echo -e "\n${C_HIL}Starting $VM_NAME:${C_RES}"
-tart run --vnc "$VM_NAME" &
+SCRIPTS_DIR="$(dirname "${BASH_SOURCE[0]}")"
+echo -e "[WARNING] vm/scripts/start is deprecated; use 'scripts/vm/start' or 'env-setup vm start' instead." >&2
+exec "$SCRIPTS_DIR/../../scripts/vm/start" "$@"

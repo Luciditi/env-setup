@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPTS_DIR="$(dirname "${BASH_SOURCE[0]}")"
+# shellcheck source=scripts/_common
+source "$SCRIPTS_DIR/../_common"
+# shellcheck source=scripts/_vm
+source "$SCRIPTS_DIR/../_vm"
+# shellcheck source=scripts/_remote
+source "$SCRIPTS_DIR/../_remote"
+
+TARGET_VM=""
+BOOTSTRAP_URL=""
+
+if [[ $# -ge 2 ]]; then
+    TARGET_VM="$1"
+    BOOTSTRAP_URL="$2"
+elif [[ $# -eq 1 ]]; then
+    BOOTSTRAP_URL="$1"
+    TARGET_VM=$(vm_find_running)
+else
+    echo -e "usage: init [vm-name] <BOOTSTRAP_URL>" >&2
+    exit 1
+fi
+
+if [[ -z "$BOOTSTRAP_URL" ]]; then
+    echo -e "\n${C_ERR}Specify a URL to launch an init script.${C_RES}" >&2
+    exit 1
+fi
+
+if [[ -z "$TARGET_VM" ]]; then
+    echo -e "\n${C_ERR}No running test VM found!${C_RES}" >&2
+    exit 1
+fi
+
+if ! vm_running "$TARGET_VM"; then
+    echo -e "\n${C_ERR}VM $TARGET_VM is not running!${C_RES}" >&2
+    exit 1
+fi
+
+SSH_HOST=$(vm_ip "$TARGET_VM")
+echo -e "\n${C_HIL}Running init test on $TARGET_VM ($SSH_HOST):${C_RES}"
+remote_exec "$SSH_HOST" "export ENVSETUP_INTERACT=0 && bash <(curl -sL \"$BOOTSTRAP_URL\")"

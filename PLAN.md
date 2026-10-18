@@ -29,12 +29,12 @@ beads (`bd ready`, `bd show <id>`).
 | 2 | Lint configs in CI | `env-setup-8gz` | **done** |
 | 3 | 24.04 + `HOMEBREW_NO_*` + matrix | `env-setup-jpu` | **done** |
 | 4 | Testability refactor + bats | `env-setup-6tw` | **done** |
-| 5 | `vm` subcommands + `_vm`/`_remote` | `env-setup-4dd` | ready |
-| 6 | `infra/` move | `env-setup-1z6` | blocked by 5 |
+| 5 | `vm` subcommands + `_vm`/`_remote` | `env-setup-4dd` | **done** |
+| 6 | `infra/` move | `env-setup-1z6` | ready |
 | 7 | Docker config de-dup | `env-setup-sly` | blocked by 6 |
 | 8 | Warm base artifact | `env-setup-ba1` | ready (unblocked by 3) |
 | 9 | Tart E2E harness | `env-setup-8m1` | blocked by 4, 5 |
-| 10 | Exportable config | `env-setup-3xm` | blocked by 5 |
+| 10 | Exportable config | `env-setup-3xm` | ready |
 | 11 | Docs, ratchets, tag | `env-setup-8oh` | blocked by 7, 8, 9, 10 |
 
 ### Uncommitted changes so far
@@ -151,24 +151,30 @@ is empirically confirmed fixed.
 - Built Bats test suites (`tests/cli.bats` and `tests/regression_pr1.bats`) with 18 tests passing 100% green.
 - Added Bats test hook to `.pre-commit-config.yaml` and `.github/workflows/lint.yml`.
 
+## Done — PR 5 (`env-setup-4dd`)
+
+- Created `scripts/_vm` with name-targeted Tart VM operations (`vm_exists`, `vm_running`,
+  `vm_ip`, `vm_start`, `vm_stop`, `vm_create`, `vm_delete`, `vm_find_running`).
+  Guaranteed safe discovery: never touches or targets the host's `vpn` VM.
+- Created `scripts/_remote` with SSH/SCP helper routines (`remote_exec`, `remote_copy`)
+  using `TART_SSH_*` credentials from `_common`.
+- Implemented modular subcommands in `scripts/vm/*` (`create`, `start`, `stop`, `status`,
+  `ssh`, `scp`, `env-setup`, `init`).
+- Converted all 7 legacy scripts in `vm/scripts/*` into backward-compatible forwarding shims
+  that emit a stderr deprecation warning and forward execution to `scripts/vm/*`.
+- Wired `scripts/env-setup vm <subcommand>` dispatch directly before Ansible checks.
+- Updated `-A` aliases in `scripts/env-setup` to point to `$INSTALL_DIR/scripts/vm/*` with
+  a deprecation notice on stderr so `eval "$(env-setup -A)"` remains clean.
+- Fixed duplicate empty macos settings keys in `docker/default.config.yml`.
+- Added 20 new Bats tests in `tests/vm.bats` and updated `tests/cli.bats` (now 38 Bats
+  tests passing 100% green).
+- ShellCheck, yamllint, ansible-lint, and Bats tests all passing 100% clean locally.
+
 ---
 
 ## Next up
 
-### PR 5 — vm subcommands (`env-setup-4dd`)
-
-`getopts` already halts at the first non-flag word; only two changes needed: stop
-shifting *inside* the loop (the current per-case `shift "$((OPTIND-1))"` corrupts
-`OPTIND`) and declare `s:`/`t:` as taking arguments.
-
-Name-targeted discovery is the core fix — current code picks the first running VM:
-```bash
-vm_running() { tart list --source local --format json \
-  | jq -er --arg n "$1" 'map(select(.Name==$n and .State=="running"))|length>0' >/dev/null; }
-```
-Keep `-A` emitting byte-identical alias *names* (users have `eval "$(env-setup -A)"`
-in their shells); deprecation notice to **stderr** so `eval` stays clean. `-A`
-currently still points at `vm/scripts/*` — repoint to `scripts/vm/*` in this PR.
+### PR 6 — `infra/` move (`env-setup-1z6`), unblocked by PR 5
 
 ### PR 8 — warm base (`env-setup-ba1`), unblocked by PR 3
 
