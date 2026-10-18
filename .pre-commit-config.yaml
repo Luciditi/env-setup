@@ -5,7 +5,7 @@ repos:
     hooks:
       - id: shellcheck
         args: ["-x"]
-        files: "^(scripts/|terraform/scripts/|vm/scripts/)"
+        files: "^(scripts/|infra/terraform/scripts/)"
         types_or: [shell, bash, text]
         exclude: "^.*\\.(md|yml|yaml|json|toml|xml|txt|ini)$"
 

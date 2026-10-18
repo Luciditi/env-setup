@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-SCRIPTS_DIR="$(dirname "${BASH_SOURCE[0]}")"
-echo -e "[WARNING] vm/scripts/create is deprecated; use 'scripts/vm/create' or 'env-setup vm create' instead." >&2
-exec "$SCRIPTS_DIR/../../scripts/vm/create" "$@"

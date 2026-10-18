@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-SCRIPTS_DIR="$(dirname "${BASH_SOURCE[0]}")"
-echo -e "[WARNING] vm/scripts/init is deprecated; use 'scripts/vm/init' or 'env-setup vm init' instead." >&2
-exec "$SCRIPTS_DIR/../../scripts/vm/init" "$@"

@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-SCRIPTS_DIR="$(dirname "${BASH_SOURCE[0]}")"
-echo -e "[WARNING] vm/scripts/stop is deprecated; use 'scripts/vm/stop' or 'env-setup vm stop' instead." >&2
-exec "$SCRIPTS_DIR/../../scripts/vm/stop" "$@"

@@ -219,25 +219,3 @@ load test_helper
     run cat "$TEST_TMP/remote.calls"
     [[ "$output" =~ "admin@192.168.64.60 hostname" ]]
 }
-
-@test "vm/scripts/ssh shim emits deprecation warning on stderr and forwards" {
-    make_stub "tart" '
-        if [[ "$1" == "list" ]]; then
-            echo '\''[{"Name":"es-auto","State":"running"}]'\''
-            exit 0
-        fi
-        if [[ "$1" == "ip" && "$2" == "es-auto" ]]; then
-            echo "192.168.64.60"
-            exit 0
-        fi
-        exit 1
-    '
-    make_stub "sshpass" '
-        echo "sshpass $@" >> "$TEST_TMP/remote.calls"
-    '
-    run "$REPO_ROOT/vm/scripts/ssh" "es-auto" "uptime"
-    [ "$status" -eq 0 ]
-    [[ "$output" =~ "deprecated" ]]
-    run cat "$TEST_TMP/remote.calls"
-    [[ "$output" =~ "admin@192.168.64.60 uptime" ]]
-}

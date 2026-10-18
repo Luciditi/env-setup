@@ -30,8 +30,8 @@ beads (`bd ready`, `bd show <id>`).
 | 3 | 24.04 + `HOMEBREW_NO_*` + matrix | `env-setup-jpu` | **done** |
 | 4 | Testability refactor + bats | `env-setup-6tw` | **done** |
 | 5 | `vm` subcommands + `_vm`/`_remote` | `env-setup-4dd` | **done** |
-| 6 | `infra/` move | `env-setup-1z6` | ready |
-| 7 | Docker config de-dup | `env-setup-sly` | blocked by 6 |
+| 6 | `infra/` move | `env-setup-1z6` | **done** |
+| 7 | Docker config de-dup | `env-setup-sly` | ready |
 | 8 | Warm base artifact | `env-setup-ba1` | ready (unblocked by 3) |
 | 9 | Tart E2E harness | `env-setup-8m1` | blocked by 4, 5 |
 | 10 | Exportable config | `env-setup-3xm` | ready |
@@ -170,11 +170,23 @@ is empirically confirmed fixed.
   tests passing 100% green).
 - ShellCheck, yamllint, ansible-lint, and Bats tests all passing 100% clean locally.
 
+## Done — PR 6 (`env-setup-1z6`)
+
+- Moved `docker/` -> `infra/docker/`.
+- Moved `terraform/` -> `infra/terraform/`.
+- Moved `router/` -> `infra/router/`.
+- Removed obsolete `vm/` directory and shims.
+- Updated `infra/terraform/scripts/*` (9 scripts) to source `scripts/_common` from `../../../scripts/_common`.
+- Updated `.github/workflows/deploy-image.yml`, `.github/workflows/tf.yml`, `.github/workflows/lint.yml`, and `.pre-commit-config.yaml`.
+- Updated documentation links in `README.md`, `DEV-README.md`, `CONTRIBUTING.md`, and `infra/docker/README.md`.
+- Removed legacy `vm/scripts/ssh` shim test in `tests/vm.bats`.
+- Verified with Bats (37/37 passing), ShellCheck (0 findings), and pre-commit (all passing).
+
 ---
 
 ## Next up
 
-### PR 6 — `infra/` move (`env-setup-1z6`), unblocked by PR 5
+### PR 7 — Docker config de-dup (`env-setup-sly`), unblocked by PR 6
 
 ### PR 8 — warm base (`env-setup-ba1`), unblocked by PR 3
 

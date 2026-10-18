@@ -15,9 +15,9 @@ and all its prerequisites. The image can be configured with a few build argument
 Here's an example to build locally:
 ```
 SSH_KEY=$HOME/.ssh/id_rsa
-ENVSETUP_CONFIG=docker/default.config.yml
+ENVSETUP_CONFIG=infra/docker/default.config.yml
 ENVSETUP_VERSION=0.0.0
-DOCKERFILE=docker/Dockerfile
+DOCKERFILE=infra/docker/Dockerfile
 #DOCKER_PLATFORMS=linux/amd64,linux/arm64
 DOCKER_PLATFORMS=linux/amd64
 DOCKER_TAG=$ENVSETUP_VERSION-default
@@ -32,7 +32,7 @@ docker buildx build --secret id=ssh,src="$SSH_KEY" --platform $DOCKER_PLATFORMS 
 Here's an example to run locally:
 - Run w/ SSH key mounted: `docker run -it --rm --platform linux/amd64 -v "$HOME/.ssh/id_rsa:/home/user/.ssh/id_rsa" ghcr.io/luciditi/env-setup`
 - Run w/ SSH key & dotfiles mounted: `docker run -it --rm --platform linux/amd64 -v "$HOME/.ssh/id_rsa:/home/user/.ssh/id_rsa" -v "$HOME/env-setup-dotfiles:/home/user/env-setup-dotfiles" -v "$HOME/env-setup-prv-dotfiles:/home/user/env-setup-prv-dotfiles" ghcr.io/luciditi/env-setup`
-- Add aliases in [./scripts/aliases](../scripts/aliases) and start env: `source <(curl -sL jig.io/dev-aliases) && dev-env`
+- Add aliases in [scripts/aliases](../../scripts/aliases) and start env: `source <(curl -sL jig.io/dev-aliases) && dev-env`
 
 ## Hosted images
 You can pull images from [the GitHub Container Repo](https://github.com/Luciditi/env-setup/pkgs/container/env-setup).

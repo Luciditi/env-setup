@@ -14,8 +14,8 @@ It will build the following:
 ## test scripts
 The `scripts` directory has a few scripts to test the built infrastructure:
 
-- [scripts/env-setup](scripts/env-setup): test the [env-setup script](../scripts/env-setup).
-- [scripts/init](scripts/init): test the [init script](../scripts/init).
+- [scripts/env-setup](scripts/env-setup): test the [env-setup script](../../scripts/env-setup).
+- [scripts/init](scripts/init): test the [init script](../../scripts/init).
 - [scripts/macos-ard-connect](scripts/macos-ard-connect): connect to the macos GUI via VNC.
 - [scripts/macos-ard-enable](scripts/macos-ard-enable): enable Apple Remote Desktop on the macos host.
 - [scripts/macos-ard-ssh](scripts/macos-ard-ssh): setup an SSH/ARD tunnel.

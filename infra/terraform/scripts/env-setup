@@ -6,28 +6,23 @@ set -euo pipefail
 
 SCRIPTS_DIR="$(dirname "$0")"
 # shellcheck source=scripts/_common
-source "$SCRIPTS_DIR/../../scripts/_common"
+source "$SCRIPTS_DIR/../../../scripts/_common"
 HOST_TYPE=${1:-"linux"}; if [[ "${1:-""}" != "" ]]; then shift; fi
-DATE=$(date -u +%Y-%m-%dT%H-%M-%SZ)
-IMAGE_NAME=${1:-"env-setup-$DATE"}
-IMAGE_DESCRIPTION=${2:-"a new image built from a env-setup test box."}
 
 ############################################################################
-# CREATE AMI FROM INSTANCE
+# TEST ENV-SETUP
 ############################################################################
 
 if [[ ! -x "$(command -v jq)" ]]; then
     echo -e "\n${C_ERR}jq is required!${C_RES}"
     exit 1
 fi
-if [[ ! -x "$(command -v aws)" ]]; then
-    echo -e "\n${C_ERR}aws is required!${C_RES}"
-    exit 1
-fi
 
 HOST_INFO=$(terraform output -json hosts)
+KEY=$(echo "$HOST_INFO" | jq -r ".$HOST_TYPE.key")
 SSH_HOST=$(echo "$HOST_INFO" | jq -r ".$HOST_TYPE.name")
-ID=$(echo "$HOST_INFO" | jq -r ".$HOST_TYPE.id")
+SSH_USER=$(echo "$HOST_INFO" | jq -r ".$HOST_TYPE.user")
+SSH_CMD="ssh -t -i $KEY $SSH_USER@$SSH_HOST"
 
-echo -e "\n${C_HIL}Creating $IMAGE_NAME AMI from $SSH_HOST ($ID):${C_RES}"
-aws ec2 create-image --instance-id "$ID" --name "$IMAGE_NAME" --description "$IMAGE_DESCRIPTION"
+echo -e "\n${C_HIL}Running $HOST_TYPE env-setup $* test on $SSH_HOST:${C_RES}"
+${SSH_CMD} -C "export ENVSETUP_INTERACT=0 && ./env-setup/scripts/env-setup $*"

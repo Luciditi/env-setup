@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-SCRIPTS_DIR="$(dirname "${BASH_SOURCE[0]}")"
-echo -e "[WARNING] vm/scripts/env-setup is deprecated; use 'scripts/vm/env-setup' or 'env-setup vm env-setup' instead." >&2
-exec "$SCRIPTS_DIR/../../scripts/vm/env-setup" "$@"

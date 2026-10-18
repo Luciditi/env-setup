@@ -6,11 +6,12 @@ set -euo pipefail
 
 SCRIPTS_DIR="$(dirname "$0")"
 # shellcheck source=scripts/_common
-source "$SCRIPTS_DIR/../../scripts/_common"
+source "$SCRIPTS_DIR/../../../scripts/_common"
 HOST_TYPE=${1:-"linux"}; if [[ "${1:-""}" != "" ]]; then shift; fi
+BOOTSTAP_URL=${1:-""}
 
 ############################################################################
-# SEND SSH KEY TO HOST
+# TEST INIT SCRIPT
 ############################################################################
 
 if [[ ! -x "$(command -v jq)" ]]; then
@@ -18,17 +19,16 @@ if [[ ! -x "$(command -v jq)" ]]; then
     exit 1
 fi
 
-if [[ "$HOST_TYPE" == "macos" ]]; then
-    SSH_HOME="/Users"
-else
-    SSH_HOME="/home"
+if [[ -z "$BOOTSTAP_URL" ]]; then
+    echo -e "\n${C_ERR}Specify a URL to launch an init script.${C_RES}"
+    exit 1
 fi
+
 HOST_INFO=$(terraform output -json hosts)
 KEY=$(echo "$HOST_INFO" | jq -r ".$HOST_TYPE.key")
 SSH_HOST=$(echo "$HOST_INFO" | jq -r ".$HOST_TYPE.name")
 SSH_USER=$(echo "$HOST_INFO" | jq -r ".$HOST_TYPE.user")
+SSH_CMD="ssh -t -i $KEY $SSH_USER@$SSH_HOST"
 
-echo -e "\n${C_HIL}Copying $KEY to $SSH_HOST:${C_RES}"
-ssh -t -i "$KEY" "$SSH_USER@$SSH_HOST" -C "mkdir -p \"$SSH_HOME/$SSH_USER/.ssh\""
-scp -i "$KEY" "$KEY" "$SSH_USER@$SSH_HOST:$SSH_HOME/$SSH_USER/.ssh/$(basename "$KEY")"
-scp -i "$KEY" "$KEY.pub" "$SSH_USER@$SSH_HOST:$SSH_HOME/$SSH_USER/.ssh/$(basename "$KEY").pub"
+echo -e "\n${C_HIL}Running $HOST_TYPE init test on $SSH_HOST:${C_RES}"
+${SSH_CMD} -C "export ENVSETUP_INTERACT=0 && bash <(curl -sL \"$BOOTSTAP_URL\")"

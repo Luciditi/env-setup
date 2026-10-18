@@ -6,11 +6,11 @@ set -euo pipefail
 
 SCRIPTS_DIR="$(dirname "$0")"
 # shellcheck source=scripts/_common
-source "$SCRIPTS_DIR/../../scripts/_common"
-HOST_TYPE="macos"
+source "$SCRIPTS_DIR/../../../scripts/_common"
+HOST_TYPE=${1:-"linux"}; if [[ "${1:-""}" != "" ]]; then shift; fi
 
 ############################################################################
-# ENABLE ARD-SSH TUNNEL ON MACOS HOST
+# SSH TO HOST
 ############################################################################
 
 if [[ ! -x "$(command -v jq)" ]]; then
@@ -24,5 +24,9 @@ SSH_HOST=$(echo "$HOST_INFO" | jq -r ".$HOST_TYPE.name")
 SSH_USER=$(echo "$HOST_INFO" | jq -r ".$HOST_TYPE.user")
 SSH_CMD="ssh -t -i $KEY $SSH_USER@$SSH_HOST"
 
-echo -e "\n${C_HIL}Enabling Tunneling 5900 through SSH on $SSH_HOST:${C_RES}"
-${SSH_CMD} -o StrictHostKeyChecking=no -L 5900:localhost:5900
+echo -e "\n${C_HIL}Starting $HOST_TYPE shell on $SSH_HOST:${C_RES}"
+if [[ $* != "" ]];  then
+    ${SSH_CMD} -C "$*"
+else
+    ${SSH_CMD}
+fi

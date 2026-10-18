@@ -110,30 +110,29 @@ You can override these environment variables to change behavior.
 
 ### Docker
 
-The `docker` [directory](docker) contains a `Dockerfile`. The `Dockerfile` builds an Ubuntu Linux docker image with `env-setup` and all playbooks.
+The `docker` [directory](infra/docker) contains a `Dockerfile`. The `Dockerfile` builds an Ubuntu Linux docker image with `env-setup` and all playbooks.
 
-You can find pre-built images on [ghcr.io/luciditi/env-setup](https://github.com/Luciditi/env-setup/tree/main/docker#hosted-images). 
+You can find pre-built images on [ghcr.io/luciditi/env-setup](https://github.com/Luciditi/env-setup/tree/main/infra/docker#hosted-images). 
 
 To test with a quick command, run `source <(curl -sL jig.io/dev-aliases) && dev-env`. This command installs an alias for `docker run ... ghcr.io/luciditi/env-setup`.
 
 ### Terraform
 
-The `terraform` [directory](terraform) is a Terraform module. The module builds an SSH key and EC2 VMs for Linux (Ubuntu 20) and macOS (Sonoma). 
+The `terraform` [directory](infra/terraform) is a Terraform module. The module builds an SSH key and EC2 VMs for Linux (Ubuntu 20) and macOS (Sonoma). 
 
-After you build the VMs, use the [scripts](terraform/scripts) to test `env-setup` in the new VMs.
+After you build the VMs, use the [scripts](infra/terraform/scripts) to test `env-setup` in the new VMs.
 
 ### VMs in Tart
 
-The `vm` [directory](vm) has [scripts](vm/scripts) to build Linux (Ubuntu) and macOS (Sonoma) VMs in [Tart](https://tart.run/). 
+Tart VM management is built directly into the CLI via `env-setup vm`:
 
-To use these scripts, do these steps:
-1. Run `eval "$(env-setup -A)"` to create `env-vm-*` aliases.
-2. Run `env-vm-create` to create a new VM.
-3. Run `env-vm-start` to start the VM.
-4. Run `env-vm-init` to initialize the VM with `env-setup`.
-5. Run `env-vm-ssh` to open a shell in the VM.
-6. Run `env-vm-env-setup` to run `env-setup` in the VM.
-7. Run `env-vm-stop` to stop the VM.
+1. Run `env-setup vm create` to clone base Linux and macOS images.
+2. Run `env-setup vm start <name>` to launch a VM (e.g., `tahoe-vanilla` or `ubuntu`).
+3. Run `env-setup vm ssh <name>` to open a shell or run commands in the VM.
+4. Run `env-setup vm env-setup <name> [playbook]` to execute playbooks inside the VM.
+5. Run `env-setup vm stop <name>` to halt the VM.
+
+*(For shell aliases, `eval "$(env-setup -A)"` provides shortcut commands).*
 
 ## Custom Playbook
 

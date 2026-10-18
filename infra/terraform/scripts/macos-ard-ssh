@@ -6,11 +6,11 @@ set -euo pipefail
 
 SCRIPTS_DIR="$(dirname "$0")"
 # shellcheck source=scripts/_common
-source "$SCRIPTS_DIR/../../scripts/_common"
+source "$SCRIPTS_DIR/../../../scripts/_common"
 HOST_TYPE="macos"
 
 ############################################################################
-# ENABLE ARD ON MACOS HOST
+# ENABLE ARD-SSH TUNNEL ON MACOS HOST
 ############################################################################
 
 if [[ ! -x "$(command -v jq)" ]]; then
@@ -24,8 +24,5 @@ SSH_HOST=$(echo "$HOST_INFO" | jq -r ".$HOST_TYPE.name")
 SSH_USER=$(echo "$HOST_INFO" | jq -r ".$HOST_TYPE.user")
 SSH_CMD="ssh -t -i $KEY $SSH_USER@$SSH_HOST"
 
-
-echo -e "\n${C_HIL}Enabling ARD on $SSH_HOST:${C_RES}"
-${SSH_CMD} -o StrictHostKeyChecking=no -C "sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
--activate -configure -access -on \
--restart -agent -privs -all";
+echo -e "\n${C_HIL}Enabling Tunneling 5900 through SSH on $SSH_HOST:${C_RES}"
+${SSH_CMD} -o StrictHostKeyChecking=no -L 5900:localhost:5900

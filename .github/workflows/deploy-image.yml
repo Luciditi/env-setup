@@ -14,7 +14,7 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+'
   pull_request:
     paths:
-      - 'docker/**'
+      - 'infra/docker/**'
       - 'ansible/**'
       - 'scripts/**'
       - '*.config.yml'
@@ -30,12 +30,12 @@ on:
         description: "The configuration manifest used for running env-setup."
         options:
           - 'all'
-          - 'docker/default.config.yml'
-          - 'docker/.mini.config.yml'
-          - 'docker/.most.config.yml'
-          - 'docker/.none.config.yml'
+          - 'infra/docker/default.config.yml'
+          - 'infra/docker/.mini.config.yml'
+          - 'infra/docker/.most.config.yml'
+          - 'infra/docker/.none.config.yml'
         required: true
-        default: 'docker/default.config.yml'
+        default: 'infra/docker/default.config.yml'
       version:
         description: "The env-setup version tag."
         required: true
@@ -83,10 +83,10 @@ jobs:
           SELECTED="${{ github.event.inputs.config || 'all' }}"
 
           # Per-config timeouts sized to the measured cost of each manifest.
-          none='{"config":"none","file":"docker/.none.config.yml","timeout":15}'
-          mini='{"config":"mini","file":"docker/.mini.config.yml","timeout":25}'
-          default='{"config":"default","file":"docker/default.config.yml","timeout":30}'
-          most='{"config":"most","file":"docker/.most.config.yml","timeout":45}'
+          none='{"config":"none","file":"infra/docker/.none.config.yml","timeout":15}'
+          mini='{"config":"mini","file":"infra/docker/.mini.config.yml","timeout":25}'
+          default='{"config":"default","file":"infra/docker/default.config.yml","timeout":30}'
+          most='{"config":"most","file":"infra/docker/.most.config.yml","timeout":45}'
 
           case "$EVENT" in
             pull_request)
@@ -101,10 +101,10 @@ jobs:
                 MATRIX="[$none,$mini,$default,$most]"
               else
                 case "$SELECTED" in
-                  docker/.none.config.yml)   MATRIX="[$none]" ;;
-                  docker/.mini.config.yml)   MATRIX="[$mini]" ;;
-                  docker/default.config.yml) MATRIX="[$default]" ;;
-                  docker/.most.config.yml)   MATRIX="[$most]" ;;
+                  infra/docker/.none.config.yml)   MATRIX="[$none]" ;;
+                  infra/docker/.mini.config.yml)   MATRIX="[$mini]" ;;
+                  infra/docker/default.config.yml) MATRIX="[$default]" ;;
+                  infra/docker/.most.config.yml)   MATRIX="[$most]" ;;
                   *) echo "::error::unknown config '$SELECTED'"; exit 1 ;;
                 esac
               fi
@@ -208,7 +208,7 @@ jobs:
             type=registry,ref=${{ steps.get-tags.outputs.repo }}:buildcache-${{ matrix.config }}
             type=gha
           cache-to: ${{ needs.setup.outputs.push == 'true' && format('type=registry,ref={0}:buildcache-{1},mode=max', steps.get-tags.outputs.repo, matrix.config) || 'type=gha,mode=max' }}
-          file: docker/Dockerfile
+          file: infra/docker/Dockerfile
           labels: |
             org.opencontainers.image.created=${{ steps.get-tags.outputs.repo_date }}
             org.opencontainers.image.ref.name=${{ github.repository }}-${{ steps.get-tags.outputs.tag }}

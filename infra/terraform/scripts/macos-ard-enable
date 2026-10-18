@@ -6,12 +6,11 @@ set -euo pipefail
 
 SCRIPTS_DIR="$(dirname "$0")"
 # shellcheck source=scripts/_common
-source "$SCRIPTS_DIR/../../scripts/_common"
-HOST_TYPE=${1:-"linux"}; if [[ "${1:-""}" != "" ]]; then shift; fi
-USER=""; if [[ "$HOST_TYPE" == "macos" ]]; then USER="ec2-user"; fi
+source "$SCRIPTS_DIR/../../../scripts/_common"
+HOST_TYPE="macos"
 
 ############################################################################
-# SET SUDO PASS ON HOST
+# ENABLE ARD ON MACOS HOST
 ############################################################################
 
 if [[ ! -x "$(command -v jq)" ]]; then
@@ -25,5 +24,8 @@ SSH_HOST=$(echo "$HOST_INFO" | jq -r ".$HOST_TYPE.name")
 SSH_USER=$(echo "$HOST_INFO" | jq -r ".$HOST_TYPE.user")
 SSH_CMD="ssh -t -i $KEY $SSH_USER@$SSH_HOST"
 
-echo -e "\n${C_HIL}Set default $HOST_TYPE sudo password on $SSH_HOST:${C_RES}"
-${SSH_CMD} -o StrictHostKeyChecking=no -C "sudo passwd $USER";
+
+echo -e "\n${C_HIL}Enabling ARD on $SSH_HOST:${C_RES}"
+${SSH_CMD} -o StrictHostKeyChecking=no -C "sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
+-activate -configure -access -on \
+-restart -agent -privs -all";

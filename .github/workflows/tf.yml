@@ -2,7 +2,7 @@ name: terraform-checks
 
 env:
   ENVSETUP_REPO_SSH: ${{ github.event.inputs.repo || 'git@github.com:Luciditi/env-setup.git' }}
-  ENVSETUP_CONFIG: ${{ github.event.inputs.config || 'docker/default.config.yml' }}
+  ENVSETUP_CONFIG: ${{ github.event.inputs.config || 'infra/docker/default.config.yml' }}
   ENVSETUP_VERSION: ${{ github.event.inputs.version || '' }}
 
 on:
@@ -27,7 +27,7 @@ jobs:
           uses: tj-actions/changed-files@v45
           with:
             files: |
-              terraform/**
+              infra/terraform/**
     outputs:
       any_changed: ${{ steps.changed.outputs.any_changed }}
 
@@ -44,7 +44,7 @@ jobs:
       - name: Render README.md
         uses: terraform-docs/gh-actions@v1.2.0
         with:
-          working-dir: terraform
+          working-dir: infra/terraform
           output-file: README.md
           config-file: .terraform-docs.yml
           output-method: replace
@@ -63,13 +63,13 @@ jobs:
       - name: Terraform Format
         uses: dflook/terraform-fmt@v1
         with:
-          path: terraform
+          path: infra/terraform
       - name: Commit format changes
         uses: EndBug/add-and-commit@v9
         with:
           default_author: github_actions
           message: Format `*.tf` to canonical format via `tf fmt`.
-          add: 'terraform/*.tf'
+          add: 'infra/terraform/*.tf'
 
   tf-plan:
     runs-on: ubuntu-latest
@@ -82,11 +82,11 @@ jobs:
         uses: hashicorp/setup-terraform@v3
       - name: Initialize Terraform
         run: terraform init
-        working-directory: ./terraform
+        working-directory: ./infra/terraform
       - name: Terraform Plan
         if: false
         run: terraform plan
-        working-directory: ./terraform
+        working-directory: ./infra/terraform
 
   tf-sec:
     runs-on: ubuntu-latest
@@ -98,7 +98,7 @@ jobs:
       - name: Terraform Sec Scan
         uses: aquasecurity/tfsec-pr-commenter-action@v1.3.1
         with:
-          working_directory: 'terraform'
+          working_directory: 'infra/terraform'
           github_token: ${{ github.token }}
           soft_fail_commenter: true
 
@@ -113,7 +113,7 @@ jobs:
         uses: dflook/terraform-validate@v1
         id: validate
         with:
-          path: terraform
+          path: infra/terraform
       - name: Validation Failed
         if: ${{ failure() && steps.validate.outputs.failure-reason == 'validate-failed' }}
         run: echo "terraform validate failed"
