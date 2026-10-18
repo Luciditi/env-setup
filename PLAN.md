@@ -28,7 +28,7 @@ beads (`bd ready`, `bd show <id>`).
 | 1 | Foundation fixes (`_common`, 7 bugs) | `env-setup-8k5` | **done** |
 | 2 | Lint configs in CI | `env-setup-8gz` | **done** |
 | 3 | 24.04 + `HOMEBREW_NO_*` + matrix | `env-setup-jpu` | **done** |
-| 4 | Testability refactor + bats | `env-setup-6tw` | ready |
+| 4 | Testability refactor + bats | `env-setup-6tw` | **done** |
 | 5 | `vm` subcommands + `_vm`/`_remote` | `env-setup-4dd` | ready |
 | 6 | `infra/` move | `env-setup-1z6` | blocked by 5 |
 | 7 | Docker config de-dup | `env-setup-sly` | blocked by 6 |
@@ -45,7 +45,7 @@ beads (`bd ready`, `bd show <id>`).
 default.config.yml        scripts/aliases           scripts/add-playbook
 scripts/env-setup         scripts/linux/install-ansible
 scripts/macos/install-ansible                       terraform/scripts/* (9)
-vm/scripts/* (7)          PLAN.md
+vm/scripts/* (7)          tests/* (3)               PLAN.md
 ```
 
 ---
@@ -137,17 +137,23 @@ is empirically confirmed fixed.
 - Added `.pre-commit-config.yaml` supporting both `prek` and `pre-commit` for local git hooks.
 - Added `.github/workflows/lint.yml` to enforce ShellCheck, yamllint, and ansible-lint in CI.
 
+## Done — PR 4 (`env-setup-6tw`)
+
+- Extracted `parse_flags()` and `main()` from `scripts/env-setup`.
+- Added inert sourcing guard: `if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then main "$@"; fi`.
+- Fixed getopts loop shifting: stopped shifting inside loop for `-C`, `-i`, `-s`, `-t`, `-v`,
+  and declared `s:`/`t:` with arguments so `$OPTARG` is populated cleanly without corrupting `OPTIND`.
+- Fixed `ANSIBLE_TAG_FLAGS` clobbering bug: multiple tags (`-s` and `-t`) now append properly.
+- Fixed `PATH` precedence: appended `/usr/local/bin` rather than prepending, preserving test stubs.
+- Guarded `config()` interactive `select` loops with `[[ "$ENVSETUP_INTERACT" == "1" ]]`.
+- Created `tests/test_helper.bash` with PATH-stub harness recording invocations for `ansible`,
+  `ansible-playbook`, and `ansible-galaxy` in isolated scratch directories.
+- Built Bats test suites (`tests/cli.bats` and `tests/regression_pr1.bats`) with 18 tests passing 100% green.
+- Added Bats test hook to `.pre-commit-config.yaml` and `.github/workflows/lint.yml`.
+
 ---
 
 ## Next up
-
-### PR 4 — testability + bats (`env-setup-6tw`)
-
-Extract `parse_flags()`/`main()` from `scripts/env-setup` and add
-`if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then main "$@"; fi` so the file sources
-inertly. Build the PATH-stub harness recording argv. Highest-value regression
-tests are the seven PR-1 bugs — write them RED against `git stash`ed originals if
-possible, then confirm GREEN.
 
 ### PR 5 — vm subcommands (`env-setup-4dd`)
 

@@ -33,7 +33,7 @@ config() {
 
     echo -e "${C_SUC}Config currently set to ${C_WAR}$CONFIG_TYPE${C_RES}"
     echo -e "${C_SUC}$ENVSETUP_CONFIG_MSG${C_RES}\n"
-    if [[ -z "$CONFIG" ]]; then
+    if [[ -z "$CONFIG" && "$ENVSETUP_INTERACT" == "1" ]]; then
         OPTIONS="none mini default most custom"
         select CONFIG in $OPTIONS; do
             break
@@ -188,7 +188,7 @@ run_playbook() {
             ANSIBLE_TAG_FLAGS="--skip-tags $ANSIBLE_SKIPPED_TAGS"
         fi
         if [[ -n "$ANSIBLE_TAGS" ]]; then
-            ANSIBLE_TAG_FLAGS="--tags $ANSIBLE_TAGS"
+            ANSIBLE_TAG_FLAGS="${ANSIBLE_TAG_FLAGS:+$ANSIBLE_TAG_FLAGS }--tags $ANSIBLE_TAGS"
         fi
 
         # shellcheck disable=SC2086
@@ -247,182 +247,158 @@ run_playbook() {
 #/          -t: Run playbook with tags
 #/          -u: Update env-setup from its remote Git source
 #/          -v: Run env-setup with verbose mode
-SCRIPT=$(basename "$0")
-SCRIPTS_DIR="$(dirname "$0")"
+SCRIPT=$(basename "${BASH_SOURCE[0]}")
+SCRIPTS_DIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=scripts/_common
 source "$SCRIPTS_DIR/_common"
+
 usage() {
-    grep '^#/' "$0" | cut -c4- | sed -e "s/\$SCRIPT/$SCRIPT/g" ; exit 0 ;
+    grep '^#/' "${BASH_SOURCE[0]}" | cut -c4- | sed -e "s/\$SCRIPT/$SCRIPT/g" ; exit 0 ;
 }
-expr "$*" : ".*--help" > /dev/null && usage
 
-# Handle options
-# Add options x: - required arg
-while getopts 'AcCheistuv' FLAG; do
-    # shellcheck disable=SC2317
-    case "${FLAG}" in
+parse_flags() {
+    expr "$*" : ".*--help" > /dev/null && usage
 
-        A)
-            echo "alias env-vm-create=\"$INSTALL_DIR/vm/scripts/create\""
-            echo "alias env-vm-env-setup=\"$INSTALL_DIR/vm/scripts/env-setup\""
-            echo "alias env-vm-init=\"$INSTALL_DIR/vm/scripts/init\""
-            echo "alias env-vm-scp=\"$INSTALL_DIR/vm/scripts/scp\""
-            echo "alias env-vm-ssh=\"$INSTALL_DIR/vm/scripts/ssh\""
-            echo "alias env-vm-start=\"$INSTALL_DIR/vm/scripts/start\""
-            echo "alias env-vm-stop=\"$INSTALL_DIR/vm/scripts/stop\""
-            exit 0
-            ;;
+    OPTIND=1
+    while getopts 'AcCheis:t:uv' FLAG; do
+        # shellcheck disable=SC2317
+        case "${FLAG}" in
+            A)
+                echo "alias env-vm-create=\"$INSTALL_DIR/vm/scripts/create\""
+                echo "alias env-vm-env-setup=\"$INSTALL_DIR/vm/scripts/env-setup\""
+                echo "alias env-vm-init=\"$INSTALL_DIR/vm/scripts/init\""
+                echo "alias env-vm-scp=\"$INSTALL_DIR/vm/scripts/scp\""
+                echo "alias env-vm-ssh=\"$INSTALL_DIR/vm/scripts/ssh\""
+                echo "alias env-vm-start=\"$INSTALL_DIR/vm/scripts/start\""
+                echo "alias env-vm-stop=\"$INSTALL_DIR/vm/scripts/stop\""
+                exit 0
+                ;;
+            c) shift "$((OPTIND-1))"; config "${1:-""}"; exit 0 ;;
+            C) ANSIBLE_CHECK="-C" ;;
+            h) usage ;;
+            e)
+                if [[ -z "${EDITOR:-}" ]]; then
+                    echo -e "${C_ERR}\$EDITOR is not set${C_RES}"
+                    echo -e "${C_WAR}e.g. EDITOR=vim $SCRIPT -e${C_RES}"
+                    exit 1
+                fi
+                "$EDITOR" "$INSTALL_DIR/config.yml"
+                echo -e "${C_SUC}Updated ${C_WAR}$INSTALL_DIR/config.yml${C_RES}"
+                exit 0
+                ;;
+            i) ANSIBLE_PLAYBOOK_INFO="--list-tasks" ;;
+            s) ANSIBLE_SKIPPED_TAGS="$OPTARG" ;;
+            t) ANSIBLE_TAGS="$OPTARG" ;;
+            u) update; exit 0 ;;
+            v)
+                set -vx
+                ANSIBLE_VERBOSE="-vvv"
+                ANSIBLE_STDOUT_CALLBACK="debug"
+                ;;
+            *) : ;;
+        esac
+    done
+    shift "$((OPTIND-1))"
+    PLAYBOOK="${1:-""}"
+}
 
-        c) shift "$((OPTIND-1))"; config "${1:-""}"; exit 0 ;;
+main() {
+    parse_flags "$@"
 
-        C)
-            ANSIBLE_CHECK="-C"
-            shift "$((OPTIND-1))"
-            ;;
+    ANSIBLE_SUDO=${ANSIBLE_SUDO-"-K"}
+    ANSIBLE_CHECK=${ANSIBLE_CHECK:-""}
+    ANSIBLE_PLAYBOOK_INFO=${ANSIBLE_PLAYBOOK_INFO:-""}
+    ANSIBLE_SKIPPED_TAGS=${ANSIBLE_SKIPPED_TAGS:-""}
+    ANSIBLE_TAGS=${ANSIBLE_TAGS:-""}
+    ANSIBLE_VERBOSE=${ANSIBLE_VERBOSE:-""}
+    # unixy | dense | debug | yaml | selective
+    export ANSIBLE_STDOUT_CALLBACK=${ANSIBLE_STDOUT_CALLBACK:-"unixy"}
+    export ANSIBLE_ROLES_PATH="$HOME/.ansible/roles"
+    ENVSETUP_SELECT_MSG="Select an env-setup playbook (enter q to quit):"
+    INIT_PLAYBOOK=".00-init"
 
-        h) usage ;;
+    if [[ "$ENVSETUP_OS" == darwin* ]] && command -v python3 > /dev/null 2>&1; then
+        PY_VER=$(python3 -m site --user-site 2> /dev/null | cut -d'/' -f6 || true)
+        if [[ -n "$PY_VER" && ":$PATH:" != *":$HOME/Library/Python/$PY_VER/bin:"* ]]; then
+            PATH="$PATH:$HOME/Library/Python/$PY_VER/bin"
+        fi
+    fi
+    if [[ ":$PATH:" != *":/usr/local/bin:"* ]]; then
+        export PATH="$PATH:/usr/local/bin"
+    fi
 
-        e)
-            # Must be INSTALL_DIR, matching config(); these diverge whenever
-            # ENVSETUP_INSTALL_DIR is set, so -e used to edit a different file
-            # than the one -c manages.
-            if [[ -z "${EDITOR:-}" ]]; then
-                echo -e "${C_ERR}\$EDITOR is not set${C_RES}"
-                echo -e "${C_WAR}e.g. EDITOR=vim $SCRIPT -e${C_RES}"
-                exit 1
+    SUGGEST_ANSIBLE=$(if [[ -x "$(command -v ansible)" ]]; then \
+        echo "0"; else echo "${ENVSETUP_SUGGEST_ANSIBLE:-1}"; fi)
+    if [[ $SUGGEST_ANSIBLE == "1" ]]; then
+        echo -e "To begin we'll need to...\n"
+        if [[ $ENVSETUP_OS =~ "darwin"* ]]; then
+            SUGGEST_PIP=$(if [[ "$(python3 -m pip -V 2> /dev/null)" ]]; then \
+                echo "0"; else echo "${ENVSETUP_SUGGEST_PIP:-1}"; fi)
+            if [[ $SUGGEST_PIP == "1" ]]; then
+                echo -e "[ ] install Pip"
             fi
-            "$EDITOR" "$INSTALL_DIR/config.yml"
-            echo -e "${C_SUC}Updated ${C_WAR}$INSTALL_DIR/config.yml${C_RES}"
-            exit 0
-            ;;
+        fi
+        echo -e "[ ] install Ansible"
+        if [[ $ENVSETUP_INTERACT == "1" ]]; then
+            read -r -p "Continue? (yes/no): " ANSWER
+            [[ $ANSWER == "yes" ]] || exit 0
+            echo -e "\n"
+        fi
+    fi
 
-        i)
-            ANSIBLE_PLAYBOOK_INFO="--list-tasks"
-            shift "$((OPTIND-1))"
+    case "$ENVSETUP_OS" in
+        darwin*)
+            if [[ $SUGGEST_ANSIBLE == "1" ]]; then
+                "$SCRIPTS_DIR/macos/install-ansible"
+            fi
+            ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" \
+                && pwd)/$(basename "${BASH_SOURCE[0]}")"
+            PLAYBOOKS="${ENVSETUP_PLAYBOOKS_DIR:-"$(dirname "$(dirname "$ABSOLUTE_PATH")")/ansible/macos"}"
             ;;
-
-        s)
-            shift "$((OPTIND-1))"
-            ANSIBLE_SKIPPED_TAGS="$1"
-            shift "$((OPTIND-1))"
+        linux*)
+            if [[ $SUGGEST_ANSIBLE == "1" ]]; then
+                "$SCRIPTS_DIR/linux/install-ansible"
+            fi
+            PLAYBOOKS="${ENVSETUP_PLAYBOOKS_DIR:-"$(dirname "$(realpath "$SCRIPTS_DIR")")/ansible/linux"}"
             ;;
-
-        t)
-            shift "$((OPTIND-1))"
-            ANSIBLE_TAGS="$1"
-            shift "$((OPTIND-1))"
+        *)
+            echo -e "${C_WAR}Unsupported OS${C_RES}\n"
+            exit 1
             ;;
-
-        u) update; exit 0 ;;
-
-        v)
-            set -vx
-            ANSIBLE_VERBOSE="-vvv"
-            ANSIBLE_STDOUT_CALLBACK="debug"
-            shift "$((OPTIND-1))"
-            ;;
-        *) : ;;
     esac
-done
 
-############################################################################
-# VARS
-############################################################################
-ANSIBLE_SUDO=${ANSIBLE_SUDO:-"-K"}
-ANSIBLE_CHECK=${ANSIBLE_CHECK:-""}
-ANSIBLE_PLAYBOOK_INFO=${ANSIBLE_PLAYBOOK_INFO:-""}
-ANSIBLE_SKIPPED_TAGS=${ANSIBLE_SKIPPED_TAGS:-""}
-ANSIBLE_TAGS=${ANSIBLE_TAGS:-""}
-ANSIBLE_VERBOSE=${ANSIBLE_VERBOSE:-""}
-# unixy | dense | debug | yaml | selective
-export ANSIBLE_STDOUT_CALLBACK=${ANSIBLE_STDOUT_CALLBACK:-"unixy"}
-export ANSIBLE_ROLES_PATH="$HOME/.ansible/roles"
-ENVSETUP_SELECT_MSG="Select an env-setup playbook (enter q to quit):"
-INIT_PLAYBOOK=".00-init"
-# The Python user-base bin is a macOS-specific path, but this ran on Linux
-# too -- and under `set -euo pipefail` it killed the script outright on any
-# host without python3.
-if [[ "$ENVSETUP_OS" == darwin* ]] && command -v python3 > /dev/null 2>&1; then
-    PY_VER=$(python3 -m site --user-site 2> /dev/null | cut -d'/' -f6 || true)
-    if [[ -n "$PY_VER" ]]; then
-        PATH="$HOME/Library/Python/$PY_VER/bin:$PATH"
+    if [[ ! -f "$PLAYBOOKS/$INIT_PLAYBOOK/.init" ]]; then
+        run_playbook "Initial" "$PLAYBOOKS/$INIT_PLAYBOOK"
     fi
-fi
-export PATH="/usr/local/bin:$PATH"
-PLAYBOOK=${1:-""}
 
-############################################################################
-# MAIN
-############################################################################
-
-SUGGEST_ANSIBLE=$(if [[ -x "$(command -v ansible)" ]]; then \
-    echo "0"; else echo "${ENVSETUP_SUGGEST_ANSIBLE:-1}"; fi)
-if [[ $SUGGEST_ANSIBLE == "1" ]]; then
-    echo -e "To begin we'll need to...\n"
-    if [[ $ENVSETUP_OS =~ "darwin"* ]]; then
-        SUGGEST_PIP=$(if [[ "$(python3 -m pip -V 2> /dev/null)" ]]; then \
-            echo "0"; else echo "${ENVSETUP_SUGGEST_PIP:-1}"; fi)
-        if [[ $SUGGEST_PIP == "1" ]]; then
-            echo -e "[ ] install Pip"
-        fi
-    fi
-    echo -e "[ ] install Ansible"
-    if [[ $ENVSETUP_INTERACT == "1" ]]; then
-        read -r -p "Continue? (yes/no): " ANSWER
-        [[ $ANSWER == "yes" ]] || exit 0
-        echo -e "\n"
-    fi
-fi
-
-case "$ENVSETUP_OS" in
-    darwin*)
-        if [[ $SUGGEST_ANSIBLE == "1" ]]; then
-            "$SCRIPTS_DIR/macos/install-ansible"
-        fi
-        ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" \
-            && pwd)/$(basename "${BASH_SOURCE[0]}")"
-        PLAYBOOKS="$(dirname "$(dirname "$ABSOLUTE_PATH")")/ansible/macos"
-        ;;
-    linux*)
-        if [[ $SUGGEST_ANSIBLE == "1" ]]; then
-            "$SCRIPTS_DIR/linux/install-ansible"
-        fi
-        PLAYBOOKS="$(dirname "$(realpath "$SCRIPTS_DIR")")/ansible/linux"
-        ;;
-    *)
-        echo -e "${C_WAR}Unsupported OS${C_RES}\n"
-        exit 1
-        ;;
-esac
-
-if [[ ! -f "$PLAYBOOKS/$INIT_PLAYBOOK/.init" ]]; then
-    run_playbook "Initial" "$PLAYBOOKS/$INIT_PLAYBOOK"
-fi
-
-if [[ -z "$PLAYBOOK" ]]; then
-    echo -e "${C_SUC}$ENVSETUP_SELECT_MSG${C_RES}\n"
-    # shellcheck disable=SC2116,SC2046
-    # ls -d /home/ubuntu/env-setup/ansible/linux/* | xargs -n1 basename
-    OPTIONS=$(find "$PLAYBOOKS/"* -type d -print0 | xargs -0 -n1 basename)
-    select PLAYBOOK in $OPTIONS; do
-        if [[ "$PLAYBOOK" == "" ]]; then
-            echo -e "${C_WAR}Quit${C_RES}\n"
-            exit 0
+    if [[ -z "$PLAYBOOK" ]]; then
+        echo -e "${C_SUC}$ENVSETUP_SELECT_MSG${C_RES}\n"
+        # shellcheck disable=SC2116,SC2046
+        OPTIONS=$(find "$PLAYBOOKS/"* -type d -print0 | xargs -0 -n1 basename)
+        select PLAYBOOK in $OPTIONS; do
+            if [[ "$PLAYBOOK" == "" ]]; then
+                echo -e "${C_WAR}Quit${C_RES}\n"
+                exit 0
+            else
+                run_playbook "$PLAYBOOK" "$PLAYBOOKS/$PLAYBOOK"
+                echo -e "\n${C_SUC}$PLAYBOOK completed!${C_RES}"
+                exit 0
+            fi
+        done
+        echo -e "${C_SUC}$ENVSETUP_SELECT_MSG${C_RES}\n"
+    else
+        if [[ "$PLAYBOOK" == "all" ]]; then
+            echo -e "${C_SUC}Running all playbooks:${C_RES}\n"
+            OPTIONS=$(find "$PLAYBOOKS/"* -type d -print0 | xargs -0 -n1 basename)
+            for PLAYBOOK in $OPTIONS; do
+                run_playbook "$PLAYBOOK" "$PLAYBOOKS/$PLAYBOOK"
+            done
         else
             run_playbook "$PLAYBOOK" "$PLAYBOOKS/$PLAYBOOK"
-            echo -e "\n${C_SUC}$PLAYBOOK completed!${C_RES}"
-            exit 0
         fi
-    done
-    echo -e "${C_SUC}$ENVSETUP_SELECT_MSG${C_RES}\n"
-else
-    if [[ "$PLAYBOOK" == "all" ]]; then
-        echo -e "${C_SUC}Running all playbooks:${C_RES}\n"
-        OPTIONS=$(find "$PLAYBOOKS/"* -type d -print0 | xargs -0 -n1 basename)
-        for PLAYBOOK in $OPTIONS; do
-            run_playbook "$PLAYBOOK" "$PLAYBOOKS/$PLAYBOOK"
-        done
-    else
-        run_playbook "$PLAYBOOK" "$PLAYBOOKS/$PLAYBOOK"
     fi
+}
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
 fi

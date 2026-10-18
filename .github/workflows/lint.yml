@@ -62,3 +62,13 @@ jobs:
             echo "Linting playbook directory: $dir"
             (cd "$dir" && ansible-lint main.yml)
           done
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Bats
+        run: sudo apt-get install -y bats
+      - name: Run Bats Tests
+        run: bats tests

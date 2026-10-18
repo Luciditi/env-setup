@@ -23,3 +23,10 @@ repos:
         language: system
         files: '^ansible/.*main\.ya?ml$'
         pass_filenames: true
+
+      - id: bats
+        name: bats tests
+        entry: bats tests
+        language: system
+        pass_filenames: false
+        files: "^(scripts/|tests/)"
