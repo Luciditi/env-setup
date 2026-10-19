@@ -35,7 +35,7 @@ beads (`bd ready`, `bd show <id>`).
 | 8 | Warm base artifact | `env-setup-ba1` | **done** |
 | 9 | Tart E2E harness | `env-setup-8m1` | **done** |
 | 10 | Exportable config | `env-setup-3xm` | **done** |
-| 11 | Docs, ratchets, tag | `env-setup-8oh` | ready |
+| 11 | Docs, ratchets, tag | `env-setup-8oh` | **done** |
 
 ### Uncommitted changes so far
 
@@ -252,11 +252,24 @@ is empirically confirmed fixed.
 
 ---
 
-## Next up
+## Done — PR 11 (`env-setup-8oh`)
 
-### PR 11 — Docs, ratchets, tag (`env-setup-8oh`)
-
-Documentation updates, workflow badges, version bump to `3.0.0`, tagging, and release preparation.
+- Removed deprecated Gemini Code Assist workflows (`gemini-cli.yml`, `gemini-issue-automated-triage.yml`, `gemini-issue-scheduled-triage.yml`, `gemini-pr-review.yml`).
+- Pinned all remaining GitHub Actions to immutable full commit SHAs using `ratchet pin`, preserving `# ratchet:<action>@<tag>` version comments (`deploy-image.yml`, `lint.yml`, `tf.yml`).
+- Formatted workflow ratchet comments to comply 100% with `yamllint`.
+- Updated `README.md`:
+  - Added CI workflow badges for Lint, Deploy Image, and Terraform.
+  - Documented `env-setup export [path]` configuration export.
+  - Documented updated Tart VM subcommands (`env-setup vm warm`, `env-setup vm test`).
+  - Documented `Dockerfile.base` and accelerated formula intersection container caching.
+- Updated `DEV-README.md`:
+  - Added Testing & Quality Gates section covering Bats (`bats tests/`), pre-commit hooks, ShellCheck, yamllint, and ansible-lint.
+  - Documented Tart VM testing and warmup workflows.
+  - Documented container base builds and formula intersection.
+- Updated `CONTRIBUTING.md`:
+  - Added Quality Gates section instructing contributors on running `bats tests/` and `pre-commit run --all-files`.
+- Verified with Bats (55/55 passing), ShellCheck (0 findings), yamllint (0 errors), and `pre-commit run --all-files` (all 4 hooks green).
+- **All 11 PRs for the v3.0.0 overhaul are complete!** Ready for release tagging (`v3.0.0`).
 
 ---
 

@@ -1,4 +1,8 @@
 # env-setup
+[![Lint](https://github.com/Luciditi/env-setup/actions/workflows/lint.yml/badge.svg)](https://github.com/Luciditi/env-setup/actions/workflows/lint.yml)
+[![Deploy Image](https://github.com/Luciditi/env-setup/actions/workflows/deploy-image.yml/badge.svg)](https://github.com/Luciditi/env-setup/actions/workflows/deploy-image.yml)
+[![Terraform](https://github.com/Luciditi/env-setup/actions/workflows/tf.yml/badge.svg)](https://github.com/Luciditi/env-setup/actions/workflows/tf.yml)
+
 <img align="right" width="250" src="https://github.com/Luciditi/env-setup/assets/1087111/7ad0d467-384e-483c-8dcd-b63c19d90c3e">
 
 `env-setup` is a workstation provisioner for macOS or Linux. It uses [Ansible](https://www.ansible.com/) and [Homebrew](https://brew.sh/).
@@ -40,6 +44,18 @@ The configuration YAML file (`config.yml`) contains a **manifest** of Ansible _v
   - `custom`: You specify a **custom** `config.yml` configuration. Read this [example config.yml](https://gist.github.com/ShawnConn/2400705e601d6315394f0e4f01bb66b8).
 
 Change the values in `config.yml` to match the needs of your environment setup. If you must manually update a `custom` configuration, run `env-setup -e` to edit the file.
+
+### Export
+
+You can export your existing machine configuration into a reusable `config.export.yml` manifest by running `env-setup export`:
+
+```bash
+env-setup export                # Exports current state to config.export.yml
+env-setup export my-config.yml  # Exports current state to custom file path
+```
+
+The export playbook inspects installed Homebrew taps, formulae, casks, Mac App Store apps, VS Code extensions, Cargo packages, and Git repositories.
+
 <img align="right" width="250" src="https://github.com/Luciditi/env-setup/assets/1087111/7d30e859-b7c6-4f21-b35d-879ae550a4f7">
 
 ### Run
@@ -110,7 +126,7 @@ You can override these environment variables to change behavior.
 
 ### Docker
 
-The `docker` [directory](infra/docker) contains a `Dockerfile`. The `Dockerfile` builds an Ubuntu Linux docker image with `env-setup` and all playbooks.
+The `infra/docker` [directory](infra/docker) contains `Dockerfile` and `Dockerfile.base`. The `Dockerfile.base` builds an accelerated warm base image with common formula dependencies pre-installed to optimize CI and local builds.
 
 You can find pre-built images on [ghcr.io/luciditi/env-setup](https://github.com/Luciditi/env-setup/tree/main/infra/docker#hosted-images). 
 
@@ -118,19 +134,21 @@ To test with a quick command, run `source <(curl -sL jig.io/dev-aliases) && dev-
 
 ### Terraform
 
-The `terraform` [directory](infra/terraform) is a Terraform module. The module builds an SSH key and EC2 VMs for Linux (Ubuntu 20) and macOS (Sonoma). 
+The `terraform` [directory](infra/terraform) is a Terraform module. The module builds an SSH key and EC2 VMs for Linux (Ubuntu 24.04) and macOS (Sonoma). 
 
 After you build the VMs, use the [scripts](infra/terraform/scripts) to test `env-setup` in the new VMs.
 
 ### VMs in Tart
 
-Tart VM management is built directly into the CLI via `env-setup vm`:
+Tart VM management and end-to-end testing is built directly into the CLI via `env-setup vm`:
 
 1. Run `env-setup vm create` to clone base Linux and macOS images.
-2. Run `env-setup vm start <name>` to launch a VM (e.g., `tahoe-vanilla` or `ubuntu`).
+2. Run `env-setup vm start <name>` to launch a VM (e.g., `tahoe-base` or `ubuntu`).
 3. Run `env-setup vm ssh <name>` to open a shell or run commands in the VM.
 4. Run `env-setup vm env-setup <name> [playbook]` to execute playbooks inside the VM.
-5. Run `env-setup vm stop <name>` to halt the VM.
+5. Run `env-setup vm warm [name]` to pre-install common formulae and Galaxy requirements.
+6. Run `env-setup vm test [macos|linux] [target]` to run automated ephemeral end-to-end tests with idempotency assertion (`changed == 0`).
+7. Run `env-setup vm stop <name>` to halt the VM.
 
 *(For shell aliases, `eval "$(env-setup -A)"` provides shortcut commands).*
 

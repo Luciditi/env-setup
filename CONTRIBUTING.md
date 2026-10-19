@@ -15,3 +15,15 @@ This project can be forked from this upstream repo and then altered via the step
 1. **CI/CD:** (Optional) Update references in `.github/workflows/*.yml` and replace `luciditi` with your own account/org for GHA compatibility. 
 
 If you want to contribute, create a branch minus any of the above changes then create a PR here.
+
+## Quality Gates
+
+Before opening a pull request, ensure all tests and quality checks pass locally:
+
+```bash
+# Run full unit and regression test suite
+bats tests/
+
+# Run all pre-commit hooks (ShellCheck, yamllint, ansible-lint, bats)
+pre-commit run --all-files
+```
