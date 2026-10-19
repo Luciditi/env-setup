@@ -19,6 +19,7 @@ load test_helper
     [ "$status" -eq 0 ]
     [[ "$output" =~ "alias env-vm-create=" ]]
     [[ "$output" =~ "alias env-vm-ssh=" ]]
+    [[ "$output" =~ "alias env-vm-warm=" ]]
     [[ "$output" =~ "scripts/vm/create" ]]
     [[ "$output" =~ "deprecated" ]]
 }

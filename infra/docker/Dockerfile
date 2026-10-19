@@ -1,54 +1,7 @@
 # syntax=docker/dockerfile:1
-#
-# Ubuntu 24.04 (noble) is REQUIRED, not cosmetic.
-#
-# Homebrew compares the host glibc/libstdc++ against its CI baseline:
-#   LINUX_GLIBC_CI_VERSION     = 2.39   (Homebrew/os.rb)
-#   LINUX_LIBSTDCXX_CI_VERSION = 6.0.33
-# When the host is below either floor, `needs_libc_formula?` and
-# `needs_compiler_formula?` both flip true and Homebrew injects
-# source builds of glibc AND gcc into every dependency chain.
-#
-# Ubuntu 20.04 ships glibc 2.31 / libstdc++ 6.0.28 -- below both. That is why
-# every config with a non-empty package list used to build for hours and time
-# out at the 6h job cap, while `.none` (empty list) passed in ~5 minutes.
-# Ubuntu 24.04 ships glibc 2.39 / libstdc++ 6.0.33 and clears both exactly.
-ARG VER=24.04
+ARG BASE_IMAGE=ghcr.io/luciditi/env-setup:base-latest
 
-FROM ubuntu:${VER} AS deps
-ENV USER=user
-ARG PASS=password
-# TZ was "US", which is not a valid zone name.
-ENV TZ=Etc/UTC \
-    DEBIAN_FRONTEND=noninteractive
-# Without these, each serial `brew install` triggers a full homebrew-core
-# `git fetch` before doing any work.
-ENV HOMEBREW_NO_AUTO_UPDATE=1 \
-    HOMEBREW_NO_INSTALL_CLEANUP=1 \
-    HOMEBREW_NO_ANALYTICS=1 \
-    HOMEBREW_NO_ENV_HINTS=1
-RUN apt-get update \
-  && apt-get install -y software-properties-common \
-  && apt-get install -y \
-    build-essential \
-    curl \
-    git \
-    libnotify-bin \ 
-    python3 \
-    python3-apt \ 
-    sudo \
-    vim \
-  && add-apt-repository --yes --update ppa:ansible/ansible \ 
-  && apt-get install -y ansible \
-  && rm -rf /var/lib/apt/lists/*
-RUN useradd -p "$(openssl passwd -1 ${PASS})" -rm -d "/home/${USER}" -s /bin/bash -g root -G sudo -u 1001 "${USER}"
-RUN mkdir -p /home/${USER}/.ssh && \
-    ssh-keyscan github.com >> /home/${USER}/.ssh/known_hosts && \ 
-    sudo chmod -R 744 /home/${USER}/.ssh && \
-    sudo chown -R ${USER}:root /home/${USER}/.ssh
-RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
-
-FROM deps AS init
+FROM ${BASE_IMAGE} AS init
 ARG ENVSETUP_DOTFILES_PRV_REPO_SSH=git@github.com:Luciditi/env-setup-dotfiles.git
 ARG ENVSETUP_DOTFILES_REPO_SSH=git@github.com:Luciditi/env-setup-dotfiles.git
 ARG ENVSETUP_REPO_SSH=git@github.com:Luciditi/env-setup.git

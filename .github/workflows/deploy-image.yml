@@ -73,7 +73,12 @@ jobs:
       matrix: ${{ steps.plan.outputs.matrix }}
       version: ${{ steps.plan.outputs.version }}
       push: ${{ steps.plan.outputs.push }}
+      base_hash: ${{ steps.plan.outputs.base_hash }}
+      base_image: ${{ steps.plan.outputs.base_image }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Plan builds
         id: plan
         shell: bash
@@ -81,6 +86,9 @@ jobs:
           set -euo pipefail
           EVENT="${{ github.event_name }}"
           SELECTED="${{ github.event.inputs.config || 'all' }}"
+          BASE_HASH="${{ hashFiles('infra/docker/Dockerfile.base', 'scripts/formula-intersection', '.mini.config.yml', 'default.config.yml', '.most.config.yml') }}"
+          REPO="ghcr.io/${{ github.repository }}"
+          BASE_IMAGE="${REPO,,}:base-${BASE_HASH}"
 
           # Per-config timeouts sized to the measured cost of each manifest.
           none='{"config":"none","file":".none.config.yml","timeout":15}'
@@ -124,12 +132,66 @@ jobs:
           esac
 
           echo "matrix={\"include\":$MATRIX}" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "push=$PUSH"       >> "$GITHUB_OUTPUT"
-          echo "Planned: $MATRIX (push=$PUSH version=$VERSION)"
+          echo "version=$VERSION"             >> "$GITHUB_OUTPUT"
+          echo "push=$PUSH"                   >> "$GITHUB_OUTPUT"
+          echo "base_hash=$BASE_HASH"         >> "$GITHUB_OUTPUT"
+          echo "base_image=$BASE_IMAGE"       >> "$GITHUB_OUTPUT"
+          echo "Planned: $MATRIX (push=$PUSH version=$VERSION base_image=$BASE_IMAGE)"
+
+  base:
+    needs: [setup]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check base image existence
+        id: check-base
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_IMAGE="${{ needs.setup.outputs.base_image }}"
+          echo "Checking manifest for $BASE_IMAGE..."
+          if docker manifest inspect "$BASE_IMAGE" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Base image $BASE_IMAGE already exists."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Base image $BASE_IMAGE not found; will build."
+          fi
+
+      - name: Set up Docker Buildx
+        if: steps.check-base.outputs.exists != 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        if: steps.check-base.outputs.exists != 'true' && needs.setup.outputs.push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push warm base
+        if: steps.check-base.outputs.exists != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          file: infra/docker/Dockerfile.base
+          platforms: linux/amd64
+          push: ${{ needs.setup.outputs.push == 'true' }}
+          tags: |
+            ${{ needs.setup.outputs.base_image }}
+            ghcr.io/${{ github.repository }}:base-latest
+          cache-from: |
+            type=registry,ref=ghcr.io/${{ github.repository }}:buildcache-base
+            type=gha
+          cache-to: ${{ needs.setup.outputs.push == 'true' && format('type=registry,ref=ghcr.io/{0}:buildcache-base,mode=max', github.repository) || 'type=gha,mode=max' }}
 
   image:
-    needs: [setup]
+    needs: [setup, base]
     runs-on: ubuntu-latest
     # Per-job cap. Previously unset, so a stuck build burned the full 6h
     # job limit before anyone noticed.
@@ -143,6 +205,9 @@ jobs:
     permissions:
       packages: write
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       # NOTE: no setup-qemu-action. This builds linux/amd64 on an amd64
       # runner, so QEMU was pure overhead.
       - name: Set up Docker Buildx
@@ -199,6 +264,7 @@ jobs:
             ENVSETUP_DOTFILES_PRV_REPO_SSH=${{ env.ENVSETUP_DOTFILES_PRV_REPO_SSH }}
             ENVSETUP_CONFIG=${{ matrix.file }}
             ENVSETUP_VERSION=${{ needs.setup.outputs.version }}
+            BASE_IMAGE=${{ needs.setup.outputs.base_image }}
           # Registry cache, not type=gha: the GHA cache is branch-scoped,
           # evicted after 7 days, and shares a 10GB repo budget that a
           # brew-heavy mode=max export blows through -- which is why zero

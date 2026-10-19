@@ -219,3 +219,52 @@ load test_helper
     run cat "$TEST_TMP/remote.calls"
     [[ "$output" =~ "admin@192.168.64.60 hostname" ]]
 }
+
+@test "scripts/vm/warm fails when no VM is running" {
+    make_stub "tart" '
+        if [[ "$1" == "list" ]]; then
+            echo "[]"
+            exit 0
+        fi
+        exit 1
+    '
+    run "$REPO_ROOT/scripts/vm/warm"
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "No running test VM found!" ]]
+}
+
+@test "scripts/vm/warm fails when specified VM is not running" {
+    make_stub "tart" '
+        if [[ "$1" == "list" ]]; then
+            echo '\''[{"Name":"es-stopped","State":"stopped"}]'\''
+            exit 0
+        fi
+        exit 1
+    '
+    run "$REPO_ROOT/scripts/vm/warm" "es-stopped"
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "VM es-stopped is not running!" ]]
+}
+
+@test "scripts/vm/warm connects to target VM and executes warmup" {
+    make_stub "tart" '
+        if [[ "$1" == "list" ]]; then
+            echo '\''[{"Name":"es-test","State":"running"}]'\''
+            exit 0
+        fi
+        if [[ "$1" == "ip" && "$2" == "es-test" ]]; then
+            echo "192.168.64.50"
+            exit 0
+        fi
+        exit 1
+    '
+    make_stub "sshpass" '
+        echo "sshpass $@" >> "$TEST_TMP/remote.calls"
+    '
+    run "$REPO_ROOT/scripts/vm/warm" "es-test"
+    [ "$status" -eq 0 ]
+    run cat "$TEST_TMP/remote.calls"
+    [[ "$output" =~ "admin@192.168.64.50" ]]
+    [[ "$output" =~ "ansible-galaxy role install" ]]
+    [[ "$output" =~ "brew install" ]]
+}

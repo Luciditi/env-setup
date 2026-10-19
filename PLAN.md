@@ -32,7 +32,7 @@ beads (`bd ready`, `bd show <id>`).
 | 5 | `vm` subcommands + `_vm`/`_remote` | `env-setup-4dd` | **done** |
 | 6 | `infra/` move | `env-setup-1z6` | **done** |
 | 7 | Docker config de-dup | `env-setup-sly` | **done** |
-| 8 | Warm base artifact | `env-setup-ba1` | ready (unblocked by 3) |
+| 8 | Warm base artifact | `env-setup-ba1` | **done** |
 | 9 | Tart E2E harness | `env-setup-8m1` | blocked by 4, 5 |
 | 10 | Exportable config | `env-setup-3xm` | ready |
 | 11 | Docs, ratchets, tag | `env-setup-8oh` | blocked by 7, 8, 9, 10 |
@@ -198,16 +198,21 @@ is empirically confirmed fixed.
 - Updated `infra/docker/README.md` and `CONTRIBUTING.md` documentation references.
 - Verified with Bats (37/37 passing), ShellCheck (0 findings), yamllint (clean), and full `pre-commit run --all-files` (all 4 hooks green).
 
+## Done — PR 8 (`env-setup-ba1`)
+
+- Created `scripts/formula-intersection`: a zero-dependency Python 3 utility computing the sorted Homebrew formula intersection across `.mini.config.yml`, `default.config.yml`, and `.most.config.yml` (15 common formulae). Supports lines, space, and JSON output formats.
+- Created `infra/docker/Dockerfile.base`: builds a warm base image containing Ubuntu 24.04, essential packages, Ansible, Linuxbrew, Galaxy requirements (`geerlingguy.dotfiles`, `community.general`), and the pre-installed warm formula intersection.
+- Refactored `infra/docker/Dockerfile`: accepts `ARG BASE_IMAGE` and starts directly `FROM ${BASE_IMAGE} AS init`, bypassing redundant package/brew installations for all config builds.
+- Updated `infra/docker/README.md` to document building `Dockerfile.base` and using `BASE_IMAGE`.
+- Implemented `scripts/vm/warm`: adds Tart VM warming subcommand that discovers the target VM (excluding `vpn`), computes the formula intersection, and remotely installs Galaxy requirements and warm formulae.
+- Updated `scripts/env-setup`: added `warm` to `vm_usage()` and added `alias env-vm-warm` to `-A`.
+- Added CI workflow base image caching in `.github/workflows/deploy-image.yml`: `setup` job hashes key manifests (`hashFiles`), `base` job probes GHCR using `docker manifest inspect`, builds/pushes the base once if missing, and shares it across matrix jobs.
+- Added 5 Bats unit tests in `tests/formula_intersection.bats` and 3 new Bats tests in `tests/vm.bats`.
+- Verified with Bats (45/45 passing), ShellCheck (0 findings), yamllint (clean), and `pre-commit run --all-files` (all 4 hooks green).
+
 ---
 
 ## Next up
-
-### PR 8 — warm base (`env-setup-ba1`), unblocked by PR 3
-
-Split `Dockerfile.base` (24.04 + brew + ansible + galaxy reqs + the
-`mini ∩ default ∩ most` formula intersection) → ghcr, keyed on `hashFiles` with a
-`docker manifest inspect` probe. One intersection generator, one unit test, two
-consumers (`Dockerfile.base` + `env-setup vm warm`).
 
 ### PR 9 — Tart E2E (`env-setup-8m1`), local-only
 

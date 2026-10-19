@@ -13,16 +13,20 @@ and all its prerequisites. The image can be configured with a few build argument
 
 ## Example build steps
 Here's an example to build locally:
-```
+```bash
+# 1. Build warm base image locally (or pull pre-built from GHCR)
+docker build -f infra/docker/Dockerfile.base -t env-setup:base-latest .
+
+# 2. Build final config image using base
 SSH_KEY=$HOME/.ssh/id_rsa
 ENVSETUP_CONFIG=default.config.yml
 ENVSETUP_VERSION=0.0.0
 DOCKERFILE=infra/docker/Dockerfile
-#DOCKER_PLATFORMS=linux/amd64,linux/arm64
 DOCKER_PLATFORMS=linux/amd64
 DOCKER_TAG=$ENVSETUP_VERSION-default
 
 docker buildx build --secret id=ssh,src="$SSH_KEY" --platform $DOCKER_PLATFORMS \
+  --build-arg="BASE_IMAGE=env-setup:base-latest" \
   --build-arg="ENVSETUP_CONFIG=$ENVSETUP_CONFIG" --build-arg="ENVSETUP_VERSION=$ENVSETUP_VERSION" \
   --label "org.opencontainers.image.ref.name=luciditi/env-setup-$DOCKER_TAG" --label "org.opencontainers.image.version=$ENVSETUP_VERSION" \
   -t "env-setup:$DOCKER_TAG" . -f "$DOCKERFILE"
