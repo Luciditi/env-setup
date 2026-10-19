@@ -15,7 +15,7 @@ and all its prerequisites. The image can be configured with a few build argument
 Here's an example to build locally:
 ```
 SSH_KEY=$HOME/.ssh/id_rsa
-ENVSETUP_CONFIG=infra/docker/default.config.yml
+ENVSETUP_CONFIG=default.config.yml
 ENVSETUP_VERSION=0.0.0
 DOCKERFILE=infra/docker/Dockerfile
 #DOCKER_PLATFORMS=linux/amd64,linux/arm64

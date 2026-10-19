@@ -2,7 +2,7 @@ name: terraform-checks
 
 env:
   ENVSETUP_REPO_SSH: ${{ github.event.inputs.repo || 'git@github.com:Luciditi/env-setup.git' }}
-  ENVSETUP_CONFIG: ${{ github.event.inputs.config || 'infra/docker/default.config.yml' }}
+  ENVSETUP_CONFIG: ${{ github.event.inputs.config || 'default.config.yml' }}
   ENVSETUP_VERSION: ${{ github.event.inputs.version || '' }}
 
 on:

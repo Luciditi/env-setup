@@ -10,7 +10,7 @@ This project can be forked from this upstream repo and then altered via the step
 1. **Bootstrap:** (Optional) Create an [ASCII art file](https://www.asciiart.eu/image-to-ascii) and name it `image.txt`
 1. **Bootstrap:** (Optional) Run `./scripts/splash image.txt` to put your logo on the launcher.
 1. **Bootstrap:** (Optional) Setup a [router](https://github.com/Luciditi/env-setup/tree/main/infra/router) to handle curl/bash setup (e.g. `bash <(curl -sL example.com/env-setup`)
-1. **Docker:** (Optional) Update the `infra/docker/*.yml` files so `git@github.com:Luciditi/env-setup-dotfiles` points to your fork(s).
+1. **Docker:** (Optional) Update the `*.config.yml` files so `git@github.com:Luciditi/env-setup-dotfiles` points to your fork(s).
 1. **Docker:** (Optional) Update the `infra/docker/Dockerfile` so `git@github.com:Luciditi/env-setup-dotfiles` points to your fork(s).
 1. **CI/CD:** (Optional) Update references in `.github/workflows/*.yml` and replace `luciditi` with your own account/org for GHA compatibility. 
 

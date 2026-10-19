@@ -63,6 +63,7 @@ prv_dotfiles_subdirs: []
 # https://github.com/geerlingguy/ansible-collection-mac/tree/master/roles/homebrew
 homebrew_taps:
   - riboseinc/easy-rsa
+  - sijanc147/formulas
 
 # NOTE: in linux we'll use the the community.general.homebrew* modules
 # name: geerlingguy.mac.homebrew
@@ -74,7 +75,7 @@ envsetup_homebrew_installed_packages:
   - bat
   - composer
   - direnv
-  - duti
+  #- duti
   - fzf
   - gh
   - go
@@ -250,8 +251,8 @@ pip_packages:
 git_repo_project_dir: ~/env-setup-git-repos
 git_repo_projects:
   - name: env-setup
-    url: git@github.com:ShawnConn/env-setup.git
-    upstream: git@github.com:Luciditi/env-setup.git
+    url: git@github.com:Luciditi/env-setup.git
+    #upstream: git@github.com:Luciditi/env-setup.git
     symlink: ~/Documents/Luciditi/projects/devops/env-setup
 
 # a vendor dir where git repos will be referenced 

@@ -30,12 +30,12 @@ on:
         description: "The configuration manifest used for running env-setup."
         options:
           - 'all'
-          - 'infra/docker/default.config.yml'
-          - 'infra/docker/.mini.config.yml'
-          - 'infra/docker/.most.config.yml'
-          - 'infra/docker/.none.config.yml'
+          - 'default.config.yml'
+          - '.mini.config.yml'
+          - '.most.config.yml'
+          - '.none.config.yml'
         required: true
-        default: 'infra/docker/default.config.yml'
+        default: 'default.config.yml'
       version:
         description: "The env-setup version tag."
         required: true
@@ -83,10 +83,10 @@ jobs:
           SELECTED="${{ github.event.inputs.config || 'all' }}"
 
           # Per-config timeouts sized to the measured cost of each manifest.
-          none='{"config":"none","file":"infra/docker/.none.config.yml","timeout":15}'
-          mini='{"config":"mini","file":"infra/docker/.mini.config.yml","timeout":25}'
-          default='{"config":"default","file":"infra/docker/default.config.yml","timeout":30}'
-          most='{"config":"most","file":"infra/docker/.most.config.yml","timeout":45}'
+          none='{"config":"none","file":".none.config.yml","timeout":15}'
+          mini='{"config":"mini","file":".mini.config.yml","timeout":25}'
+          default='{"config":"default","file":"default.config.yml","timeout":30}'
+          most='{"config":"most","file":".most.config.yml","timeout":45}'
 
           case "$EVENT" in
             pull_request)
@@ -101,10 +101,10 @@ jobs:
                 MATRIX="[$none,$mini,$default,$most]"
               else
                 case "$SELECTED" in
-                  infra/docker/.none.config.yml)   MATRIX="[$none]" ;;
-                  infra/docker/.mini.config.yml)   MATRIX="[$mini]" ;;
-                  infra/docker/default.config.yml) MATRIX="[$default]" ;;
-                  infra/docker/.most.config.yml)   MATRIX="[$most]" ;;
+                  .none.config.yml)   MATRIX="[$none]" ;;
+                  .mini.config.yml)   MATRIX="[$mini]" ;;
+                  default.config.yml) MATRIX="[$default]" ;;
+                  .most.config.yml)   MATRIX="[$most]" ;;
                   *) echo "::error::unknown config '$SELECTED'"; exit 1 ;;
                 esac
               fi

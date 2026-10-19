@@ -31,7 +31,7 @@ beads (`bd ready`, `bd show <id>`).
 | 4 | Testability refactor + bats | `env-setup-6tw` | **done** |
 | 5 | `vm` subcommands + `_vm`/`_remote` | `env-setup-4dd` | **done** |
 | 6 | `infra/` move | `env-setup-1z6` | **done** |
-| 7 | Docker config de-dup | `env-setup-sly` | ready |
+| 7 | Docker config de-dup | `env-setup-sly` | **done** |
 | 8 | Warm base artifact | `env-setup-ba1` | ready (unblocked by 3) |
 | 9 | Tart E2E harness | `env-setup-8m1` | blocked by 4, 5 |
 | 10 | Exportable config | `env-setup-3xm` | ready |
@@ -182,11 +182,25 @@ is empirically confirmed fixed.
 - Removed legacy `vm/scripts/ssh` shim test in `tests/vm.bats`.
 - Verified with Bats (37/37 passing), ShellCheck (0 findings), and pre-commit (all passing).
 
+## Done — PR 7 (`env-setup-sly`)
+
+- Consolidated configuration changes into the canonical root manifests:
+  - Repointed `git_repo_projects` in `default.config.yml`, `.mini.config.yml`, and `.most.config.yml` to `git@github.com:Luciditi/env-setup.git`.
+  - Commented out `#- duti` in `default.config.yml` and `.most.config.yml` (Cocoa UTI tool managed on macOS via `08-prefs/duti.yml`, avoiding Linuxbrew issues).
+  - Added `sijanc147/formulas` tap to `.most.config.yml` for `macprefs`.
+- Deleted redundant duplicate config manifests:
+  - `infra/docker/default.config.yml`
+  - `infra/docker/.mini.config.yml`
+  - `infra/docker/.most.config.yml`
+  - `infra/docker/.none.config.yml`
+- Updated `.github/workflows/deploy-image.yml` dispatch options, defaults, matrix paths, and case statement to point directly to root config manifests.
+- Updated `.github/workflows/tf.yml` fallback default to `default.config.yml`.
+- Updated `infra/docker/README.md` and `CONTRIBUTING.md` documentation references.
+- Verified with Bats (37/37 passing), ShellCheck (0 findings), yamllint (clean), and full `pre-commit run --all-files` (all 4 hooks green).
+
 ---
 
 ## Next up
-
-### PR 7 — Docker config de-dup (`env-setup-sly`), unblocked by PR 6
 
 ### PR 8 — warm base (`env-setup-ba1`), unblocked by PR 3
 
