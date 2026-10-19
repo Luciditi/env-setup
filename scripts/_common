@@ -76,7 +76,7 @@ INSTALL_DIR=${ENVSETUP_INSTALL_DIR:-"$ENVSETUP_DIR"}
 # Path to env-setup inside a test VM / remote host.
 ENVSETUP_REMOTE_DIR=${ENVSETUP_REMOTE_DIR:-"\$HOME/env-setup"}
 
-TART_MACOS_NAME=${TART_MACOS_NAME:-"tahoe-vanilla"}
+TART_MACOS_NAME=${TART_MACOS_NAME:-"tahoe-base"}
 TART_LINUX_NAME=${TART_LINUX_NAME:-"ubuntu"}
 # https://github.com/orgs/cirruslabs/packages?repo_name=macos-image-templates
 TART_MACOS_IMAGE="ghcr.io/cirruslabs/macos-$TART_MACOS_NAME:latest"

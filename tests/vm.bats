@@ -73,6 +73,23 @@ load test_helper
     [ "$output" = "192.168.64.42" ]
 }
 
+@test "_vm: vm_ip passes --wait flag when wait parameter provided" {
+    make_stub "tart" '
+        echo "tart $@" >> "$TEST_TMP/tart.calls"
+        if [[ "$1" == "ip" && "$2" == "es-test" && "$3" == "--wait" && "$4" == "60" ]]; then
+            echo "192.168.64.99"
+            exit 0
+        fi
+        exit 1
+    '
+    source "$REPO_ROOT/scripts/_vm"
+    run vm_ip "es-test" 60
+    [ "$status" -eq 0 ]
+    [ "$output" = "192.168.64.99" ]
+    run cat "$TEST_TMP/tart.calls"
+    [[ "$output" =~ "tart ip es-test --wait 60" ]]
+}
+
 @test "_vm: vm_start runs tart run with --vnc" {
     make_stub "tart" '
         echo "tart $@" >> "$TEST_TMP/tart.calls"
@@ -267,4 +284,77 @@ load test_helper
     [[ "$output" =~ "admin@192.168.64.50" ]]
     [[ "$output" =~ "ansible-galaxy role install" ]]
     [[ "$output" =~ "brew install" ]]
+}
+
+@test "scripts/vm/test defaults to macos and executes ephemeral lifecycle" {
+    make_stub "tart" '
+        echo "tart $@" >> "$TEST_TMP/tart.calls"
+        if [[ "$1" == "list" ]]; then
+            echo '\''[{"Name":"es-test","State":"running"}]'\''
+            exit 0
+        fi
+        if [[ "$1" == "ip" ]]; then
+            echo "192.168.64.77"
+            exit 0
+        fi
+        exit 0
+    '
+    make_stub "sshpass" '
+        echo "sshpass $@" >> "$TEST_TMP/remote.calls"
+        if [[ "$*" =~ "ANSIBLE_STDOUT_CALLBACK=json" ]]; then
+            echo '\''{"stats":{"localhost":{"ok":5,"changed":0,"failures":0}}}'\''
+        fi
+        exit 0
+    '
+    run "$REPO_ROOT/scripts/vm/test" macos .00-init
+    [ "$status" -eq 0 ]
+    run cat "$TEST_TMP/tart.calls"
+    [[ "$output" =~ "tart clone" ]]
+    [[ "$output" =~ "tart run --no-graphics" ]]
+    [[ "$output" =~ "tart ip" ]]
+    [[ "$output" =~ "tart stop" ]]
+    [[ "$output" =~ "tart delete" ]]
+    run cat "$TEST_TMP/remote.calls"
+    [[ "$output" =~ "admin@192.168.64.77" ]]
+}
+
+@test "scripts/vm/test fails when idempotency check detects changed tasks" {
+    make_stub "tart" '
+        if [[ "$1" == "list" ]]; then
+            echo '\''[{"Name":"es-test","State":"running"}]'\''
+            exit 0
+        fi
+        if [[ "$1" == "ip" ]]; then
+            echo "192.168.64.77"
+            exit 0
+        fi
+        exit 0
+    '
+    make_stub "sshpass" '
+        if [[ "$*" =~ "ANSIBLE_STDOUT_CALLBACK=json" ]]; then
+            echo '\''{"stats":{"localhost":{"ok":4,"changed":2,"failures":0}}}'\''
+        fi
+        exit 0
+    '
+    run "$REPO_ROOT/scripts/vm/test" macos .00-init
+    [ "$status" -ne 0 ]
+    [[ "$output" =~ "Idempotency check failed" ]]
+}
+
+@test "scripts/vm/test supports init target" {
+    make_stub "tart" '
+        if [[ "$1" == "ip" ]]; then
+            echo "192.168.64.77"
+            exit 0
+        fi
+        exit 0
+    '
+    make_stub "sshpass" '
+        echo "sshpass $@" >> "$TEST_TMP/remote.calls"
+        exit 0
+    '
+    run "$REPO_ROOT/scripts/vm/test" linux init
+    [ "$status" -eq 0 ]
+    run cat "$TEST_TMP/remote.calls"
+    [[ "$output" =~ "scripts/init" ]]
 }

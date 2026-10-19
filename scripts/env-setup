@@ -275,6 +275,7 @@ Subcommands:
   env-setup [vm-name] [args]   Run env-setup inside a Tart VM
   init [vm-name] <url>         Run bootstrap init script inside a Tart VM
   warm [vm-name]               Pre-install common packages and galaxy reqs in VM
+  test [macos|linux] [target]  Run ephemeral E2E tests with idempotency assertion
 EOF
 }
 
@@ -294,6 +295,7 @@ parse_flags() {
                 echo "alias env-vm-start=\"$INSTALL_DIR/scripts/vm/start\""
                 echo "alias env-vm-stop=\"$INSTALL_DIR/scripts/vm/stop\""
                 echo "alias env-vm-warm=\"$INSTALL_DIR/scripts/vm/warm\""
+                echo "alias env-vm-test=\"$INSTALL_DIR/scripts/vm/test\""
                 echo "Warning: env-vm-* aliases are deprecated; use 'env-setup vm <subcommand>' instead." >&2
                 exit 0
                 ;;

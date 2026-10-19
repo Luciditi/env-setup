@@ -33,7 +33,7 @@ beads (`bd ready`, `bd show <id>`).
 | 6 | `infra/` move | `env-setup-1z6` | **done** |
 | 7 | Docker config de-dup | `env-setup-sly` | **done** |
 | 8 | Warm base artifact | `env-setup-ba1` | **done** |
-| 9 | Tart E2E harness | `env-setup-8m1` | blocked by 4, 5 |
+| 9 | Tart E2E harness | `env-setup-8m1` | **done** |
 | 10 | Exportable config | `env-setup-3xm` | ready |
 | 11 | Docs, ratchets, tag | `env-setup-8oh` | blocked by 7, 8, 9, 10 |
 
@@ -210,27 +210,25 @@ is empirically confirmed fixed.
 - Added 5 Bats unit tests in `tests/formula_intersection.bats` and 3 new Bats tests in `tests/vm.bats`.
 - Verified with Bats (45/45 passing), ShellCheck (0 findings), yamllint (clean), and `pre-commit run --all-files` (all 4 hooks green).
 
+## Done — PR 9 (`env-setup-8m1`)
+
+- Updated `scripts/_common`: set `TART_MACOS_NAME` default to `tahoe-base` (`ghcr.io/cirruslabs/macos-tahoe-base:latest`, featuring the guest agent).
+- Updated `scripts/_vm`: enhanced `vm_ip` to support non-polling `--wait <sec>` parameter passed to `tart ip`.
+- Implemented `scripts/vm/test`:
+  - Subcommand `env-setup vm test [macos|linux] [all|init|<playbook>]` (defaults to `macos` and `all`).
+  - Implements ephemeral Copy-on-Write APFS cloning (`es-test-${OS}-$$`), with strict naming preventing any interaction with `vpn`.
+  - Immediate `EXIT` trap guaranteed cleanup (`vm_stop` and `vm_delete`).
+  - Headless background boot, waiting for IP with `vm_ip "$EPHEMERAL" 120`.
+  - Syncs working tree code to remote guest using `remote_copy`.
+  - Supports testing bootstrap `scripts/init`.
+  - Automated idempotency assertion: executes playbook run 1, then run 2 with `ANSIBLE_STDOUT_CALLBACK=json`, validating with `jq` that `stats[].changed == 0`.
+- Updated `scripts/env-setup`: documented `test` in `vm_usage()` and added `alias env-vm-test` to `-A`.
+- Added 4 new Bats tests in `tests/vm.bats` and updated `tests/cli.bats` (now 49 Bats tests passing 100% green).
+- Verified with Bats (49/49 passing), ShellCheck (0 findings), yamllint (clean), and `pre-commit run --all-files` (all 4 hooks green).
+
 ---
 
 ## Next up
-
-### PR 9 — Tart E2E (`env-setup-8m1`), local-only
-
-tart 2.30.0 has **no `snapshot` subcommand** (verified). Restore primitive is
-`tart clone <stopped-local-base>` (APFS CoW, ~1-2s); teardown is stop+delete of
-the ephemeral. `tart suspend` is *not* a restore point. `tart ip --wait <s>`
-replaces polling. `tart exec` needs a guest agent the `-vanilla` images lack —
-switch `TART_MACOS_NAME` to `macos-tahoe-base` or stay ssh-only. Note the local
-machine has `macos-sequoia-base` pulled, not `tahoe`.
-
-Highest-value assertion, free because the CLI already passes the callback through:
-```bash
-assert_idempotent() {  # 2nd run must report changed=0
-  vm_ssh "$1" "ENVSETUP_INTERACT=0 ANSIBLE_SUDO=-n env-setup $2" >/dev/null
-  out=$(vm_ssh "$1" "ENVSETUP_INTERACT=0 ANSIBLE_SUDO=-n ANSIBLE_STDOUT_CALLBACK=json env-setup $2")
-  [[ "$(jq '[.stats[].changed]|add' <<<"$out")" == "0" ]]
-}
-```
 
 ### PR 10 — export (`env-setup-3xm`)
 

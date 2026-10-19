@@ -47,8 +47,13 @@ vm_find_running() {
 
 vm_ip() {
     local name="$1"
+    local wait="${2:-""}"
     vm_require_tart || return 1
-    tart ip "$name"
+    if [[ -n "$wait" ]]; then
+        tart ip "$name" --wait "$wait"
+    else
+        tart ip "$name"
+    fi
 }
 
 vm_start() {
