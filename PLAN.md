@@ -34,8 +34,8 @@ beads (`bd ready`, `bd show <id>`).
 | 7 | Docker config de-dup | `env-setup-sly` | **done** |
 | 8 | Warm base artifact | `env-setup-ba1` | **done** |
 | 9 | Tart E2E harness | `env-setup-8m1` | **done** |
-| 10 | Exportable config | `env-setup-3xm` | ready |
-| 11 | Docs, ratchets, tag | `env-setup-8oh` | blocked by 7, 8, 9, 10 |
+| 10 | Exportable config | `env-setup-3xm` | **done** |
+| 11 | Docs, ratchets, tag | `env-setup-8oh` | ready |
 
 ### Uncommitted changes so far
 
@@ -228,20 +228,35 @@ is empirically confirmed fixed.
 
 ---
 
+## Done — PR 10 (`env-setup-3xm`)
+
+- Implemented `.09-export` playbook in both `ansible/macos/.09-export/` and `ansible/linux/.09-export/`.
+- Leading dot is load-bearing: keeps `.09-export` out of interactive menus and out of `env-setup all`.
+- Linked standard `ansible.cfg`, `inventory`, and `requirements.yml` to `../.00-init/`.
+- Created Jinja2 template `templates/config.export.yml.j2` ported from `origin/export`'s `.template.config.yml`, generating 100% yamllint-compliant configuration manifests.
+- Machine state collection:
+  - `brew bundle dump --file=- --no-restart` parses taps, installed formulas, casks, Mac App Store apps (`{ id: ..., name: ... }`), and VS Code extensions.
+  - `cargo install --list` parses crate package names (e.g. `bore-cli`, not binary name `bore`).
+  - Scans `git_repo_project_dir` and `git_repo_vendors_dir` for Git remote URLs via `git remote get-url origin`.
+  - Preserves duti handlers structure as `[]` (duti cannot enumerate handlers without extensions).
+  - Captures `envsetup_os_hostname` from `ansible_hostname`.
+  - Renders to `config.export.yml` (or custom path via `export_file`).
+- Updated `scripts/env-setup`:
+  - Mapped `export` to `.09-export`.
+  - Suppressed `-K` sudo password prompt for `.09-export` (read-only state gathering).
+  - Supported optional target output path argument: `env-setup export [path]`.
+  - Bypassed `.00-init` when running `.09-export`.
+  - Documented `export` in `usage()` and examples.
+- Added 6 Bats unit tests in `tests/export.bats` (now 55 Bats tests passing 100% green).
+- Verified with Bats (55/55 passing), ShellCheck (0 findings), yamllint (0 errors), and `pre-commit run --all-files` (all 4 hooks green).
+
+---
+
 ## Next up
 
-### PR 10 — export (`env-setup-3xm`)
+### PR 11 — Docs, ratchets, tag (`env-setup-8oh`)
 
-Ansible playbook, not bash. Name it **`.09-export`** with the leading dot — load-bearing,
-because `find "$PLAYBOOKS/"*` skips dot-dirs, keeping it out of the menu and out of
-`env-setup all`. `brew bundle dump --file=- --no-restart` covers taps/brews/casks/mas/vscode
-in one call and is installed-on-request-aware.
-
-Two corrections to the `origin/export` markers: `cargo_packages` needs
-`cargo install --list`, not `ls ~/.cargo/bin` (binary names ≠ crate names —
-`bore` vs `bore-cli`); and `duti` **cannot enumerate** handlers, only answer
-`duti -x <ext>`. Confirmed `origin/export:.none.config.yml` is byte-identical to
-main's, so the template rebase is clean.
+Documentation updates, workflow badges, version bump to `3.0.0`, tagging, and release preparation.
 
 ---
 

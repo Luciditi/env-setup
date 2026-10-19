@@ -172,7 +172,9 @@ run_playbook() {
             # shellcheck disable=SC2086
             ansible-galaxy install $ANSIBLE_VERBOSE -r requirements.yml
         fi
-        if [[ "$ANSIBLE_SUDO" == "-K" ]]; then
+        if [[ "$PLAYBOOK_NAME" == ".09-export" || "$PLAYBOOK_NAME" == "export" ]]; then
+            ANSIBLE_SUDO=""
+        elif [[ "$ANSIBLE_SUDO" == "-K" ]]; then
             echo -e "\n${C_WAR}Enter password for install permissions${C_RES}"
         else
             ANSIBLE_SUDO=""
@@ -181,6 +183,11 @@ run_playbook() {
             ANSIBLE_EXTRA_VARS="-e @../../../config.yml"
         else
             ANSIBLE_EXTRA_VARS=""
+        fi
+        if [[ "$PLAYBOOK_NAME" == ".09-export" || "$PLAYBOOK_NAME" == "export" ]]; then
+            if [[ -n "${EXPORT_TARGET:-}" ]]; then
+                ANSIBLE_EXTRA_VARS="${ANSIBLE_EXTRA_VARS:+$ANSIBLE_EXTRA_VARS }-e export_file=$EXPORT_TARGET"
+            fi
         fi
 
         ANSIBLE_TAG_FLAGS=""
@@ -235,11 +242,14 @@ run_playbook() {
 #/      Run "01-config" playbook with only the pub_dotfiles tasks
 #/   $SCRIPT -v 03-apps
 #/      Run "03-apps" playbook in verbose mode.
+#/   $SCRIPT export [output-file]
+#/      Export environment configuration to config.export.yml (or custom path).
 #/   $SCRIPT 04-my-playbook
 #/      Have $SCRIPT run the "04-my-playbook" playbook.
 #/
 #/ Subcommands:
-#/   vm <subcommand>: Tart VM management (create, start, stop, status, ssh, scp, env-setup, init)
+#/   vm <subcommand>: Tart VM management (create, start, stop, status, ssh, scp, env-setup, init, warm, test)
+#/   export [path]: Export current machine configuration to config.export.yml (or custom path)
 #/
 #/ Options:
 #/   --help/-h: Display this help message
@@ -352,6 +362,15 @@ main() {
         fi
     fi
 
+    if [[ "$PLAYBOOK" == "export" || "$PLAYBOOK" == ".09-export" ]]; then
+        if [[ "$PLAYBOOK" == "export" ]]; then
+            PLAYBOOK=".09-export"
+        fi
+        if [[ ${#EXTRA_ARGS[@]} -gt 0 ]]; then
+            EXPORT_TARGET="${EXTRA_ARGS[0]}"
+        fi
+    fi
+
     ANSIBLE_SUDO=${ANSIBLE_SUDO-"-K"}
     ANSIBLE_CHECK=${ANSIBLE_CHECK:-""}
     ANSIBLE_PLAYBOOK_INFO=${ANSIBLE_PLAYBOOK_INFO:-""}
@@ -414,7 +433,7 @@ main() {
             ;;
     esac
 
-    if [[ ! -f "$PLAYBOOKS/$INIT_PLAYBOOK/.init" ]]; then
+    if [[ "$PLAYBOOK" != ".09-export" && ! -f "$PLAYBOOKS/$INIT_PLAYBOOK/.init" ]]; then
         run_playbook "Initial" "$PLAYBOOKS/$INIT_PLAYBOOK"
     fi
 
