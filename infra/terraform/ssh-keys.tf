@@ -1,5 +1,6 @@
 module "keys" {
-  source = "terraform-aws-modules/key-pair/aws"
+  source  = "terraform-aws-modules/key-pair/aws"
+  version = "~> 2.0"
 
   key_name           = local.stack_name
   create_private_key = true
