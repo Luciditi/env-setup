@@ -88,9 +88,9 @@ After running `terraform apply` you can run these commands to test env-setup on 
 
 | Name | Source | Version |
 |------|--------|---------|
-| <a name="module_keys"></a> [keys](#module\_keys) | terraform-aws-modules/key-pair/aws | n/a |
-| <a name="module_linux"></a> [linux](#module\_linux) | terraform-aws-modules/ec2-instance/aws | n/a |
-| <a name="module_macos"></a> [macos](#module\_macos) | terraform-aws-modules/ec2-instance/aws | n/a |
+| <a name="module_keys"></a> [keys](#module\_keys) | terraform-aws-modules/key-pair/aws | ~> 2.0 |
+| <a name="module_linux"></a> [linux](#module\_linux) | terraform-aws-modules/ec2-instance/aws | ~> 5.7 |
+| <a name="module_macos"></a> [macos](#module\_macos) | terraform-aws-modules/ec2-instance/aws | ~> 5.7 |
 
 ## Resources
 
