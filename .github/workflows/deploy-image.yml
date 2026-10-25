@@ -61,6 +61,9 @@ concurrency:
   group: deploy-image-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+permissions:
+  contents: read
+
 jobs:
   # Resolve WHICH configs to build, the version string, and whether to push.
   # Replaces the old `gh workflow run` fan-out, which started four SEPARATE
@@ -75,6 +78,7 @@ jobs:
       push: ${{ steps.plan.outputs.push }}
       base_hash: ${{ steps.plan.outputs.base_hash }}
       base_image: ${{ steps.plan.outputs.base_image }}
+      repo: ${{ steps.plan.outputs.repo }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # ratchet:actions/checkout@v4
@@ -88,7 +92,8 @@ jobs:
           SELECTED="${{ github.event.inputs.config || 'all' }}"
           BASE_HASH="${{ hashFiles('infra/docker/Dockerfile.base', 'scripts/formula-intersection', '.mini.config.yml', 'default.config.yml', '.most.config.yml') }}"
           REPO="ghcr.io/${{ github.repository }}"
-          BASE_IMAGE="${REPO,,}:base-${BASE_HASH}"
+          REPO_LOWER="${REPO,,}"
+          BASE_IMAGE="${REPO_LOWER}:base-${BASE_HASH}"
 
           # Per-config timeouts sized to the measured cost of each manifest.
           none='{"config":"none","file":".none.config.yml","timeout":15}'
@@ -136,6 +141,7 @@ jobs:
           echo "push=$PUSH"                   >> "$GITHUB_OUTPUT"
           echo "base_hash=$BASE_HASH"         >> "$GITHUB_OUTPUT"
           echo "base_image=$BASE_IMAGE"       >> "$GITHUB_OUTPUT"
+          echo "repo=$REPO_LOWER"             >> "$GITHUB_OUTPUT"
           echo "Planned: $MATRIX (push=$PUSH version=$VERSION base_image=$BASE_IMAGE)"
 
   base:
@@ -143,6 +149,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
+      contents: read
       packages: write
     steps:
       - name: Checkout repository
@@ -184,11 +191,11 @@ jobs:
           push: ${{ needs.setup.outputs.push == 'true' }}
           tags: |
             ${{ needs.setup.outputs.base_image }}
-            ghcr.io/${{ github.repository }}:base-latest
+            ${{ needs.setup.outputs.repo }}:base-latest
           cache-from: |
-            type=registry,ref=ghcr.io/${{ github.repository }}:buildcache-base
+            type=registry,ref=${{ needs.setup.outputs.repo }}:buildcache-base
             type=gha
-          cache-to: ${{ needs.setup.outputs.push == 'true' && format('type=registry,ref=ghcr.io/{0}:buildcache-base,mode=max', github.repository) || 'type=gha,mode=max' }}
+          cache-to: ${{ needs.setup.outputs.push == 'true' && format('type=registry,ref={0}:buildcache-base,mode=max', needs.setup.outputs.repo) || 'type=gha,mode=max' }}
 
   image:
     needs: [setup, base]
@@ -203,6 +210,7 @@ jobs:
       max-parallel: 2
       matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
     permissions:
+      contents: read
       packages: write
     steps:
       - name: Checkout repository

@@ -96,11 +96,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # ratchet:actions/checkout@v4
       - name: Terraform Sec Scan
-        uses: aquasecurity/tfsec-pr-commenter-action@7a44c5dcde5dfab737363e391800629e27b6376b  # ratchet:aquasecurity/tfsec-pr-commenter-action@v1.3.1
+        uses: aquasecurity/tfsec-action@b466648d6e39e7c75324f25d83891162a721f2d6  # ratchet:aquasecurity/tfsec-action@v1.0.3
         with:
           working_directory: 'infra/terraform'
-          github_token: ${{ github.token }}
-          soft_fail_commenter: true
 
   tf-validate:
     runs-on: ubuntu-latest
