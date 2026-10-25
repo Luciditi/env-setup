@@ -11,6 +11,11 @@ module "linux" {
   vpc_security_group_ids = [aws_security_group.ssh_access.id]
   subnet_id              = data.aws_subnet.default.id
 
+  metadata_options = {
+    http_endpoint = "enabled"
+    http_tokens   = "required"
+  }
+
   root_block_device = [
     {
       encrypted   = true
@@ -34,6 +39,11 @@ module "macos" {
   subnet_id              = data.aws_subnet.default.id
   tenancy                = "host"
   host_id                = aws_ec2_host.dedicated[0].id
+
+  metadata_options = {
+    http_endpoint = "enabled"
+    http_tokens   = "required"
+  }
 
   root_block_device = [
     {
