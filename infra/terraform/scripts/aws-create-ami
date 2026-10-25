@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+
+# Set stop on error / enable debug
+set -euo pipefail
+#set -vx
+
+SCRIPTS_DIR="$(dirname "$0")"
+# shellcheck source=scripts/_common
+source "$SCRIPTS_DIR/../../../scripts/_common"
+HOST_TYPE=${1:-"linux"}; if [[ "${1:-""}" != "" ]]; then shift; fi
+DATE=$(date -u +%Y-%m-%dT%H-%M-%SZ)
+IMAGE_NAME=${1:-"env-setup-$DATE"}
+IMAGE_DESCRIPTION=${2:-"a new image built from a env-setup test box."}
+
+############################################################################
+# CREATE AMI FROM INSTANCE
+############################################################################
+
+if [[ ! -x "$(command -v jq)" ]]; then
+    echo -e "\n${C_ERR}jq is required!${C_RES}"
+    exit 1
+fi
+if [[ ! -x "$(command -v aws)" ]]; then
+    echo -e "\n${C_ERR}aws is required!${C_RES}"
+    exit 1
+fi
+
+HOST_INFO=$(terraform output -json hosts)
+SSH_HOST=$(echo "$HOST_INFO" | jq -r ".$HOST_TYPE.name")
+ID=$(echo "$HOST_INFO" | jq -r ".$HOST_TYPE.id")
+
+echo -e "\n${C_HIL}Creating $IMAGE_NAME AMI from $SSH_HOST ($ID):${C_RES}"
+aws ec2 create-image --instance-id "$ID" --name "$IMAGE_NAME" --description "$IMAGE_DESCRIPTION"

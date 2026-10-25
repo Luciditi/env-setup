@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+"""
+Calculate the common Homebrew formula intersection across env-setup manifests.
+Zero external dependencies (uses Python standard library only).
+"""
+
+import argparse
+import json
+import os
+import re
+import sys
+
+
+def extract_packages(filepath):
+    packages = []
+    in_section = False
+    with open(filepath, "r", encoding="utf-8") as f:
+        for line in f:
+            stripped = line.strip()
+            if not in_section:
+                if re.match(r"^envsetup_homebrew_installed_packages:\s*(\[\])?", stripped):
+                    if "[]" in stripped:
+                        return set()
+                    in_section = True
+            else:
+                if line and not line[0].isspace() and stripped and not stripped.startswith("#"):
+                    break
+                m = re.match(r"^\s*-\s*([a-zA-Z0-9_\-\./]+)", stripped)
+                if m:
+                    packages.append(m.group(1))
+    return set(packages)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Compute intersection of Homebrew packages across configuration files."
+    )
+    parser.add_argument(
+        "configs",
+        nargs="*",
+        help="Paths to YAML config files (default: .mini.config.yml, default.config.yml, .most.config.yml)",
+    )
+    parser.add_argument(
+        "--format",
+        choices=["lines", "space", "json"],
+        default="lines",
+        help="Output format: lines (default), space, or json",
+    )
+
+    args = parser.parse_args()
+
+    repo_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    config_paths = args.configs
+    if not config_paths:
+        config_paths = [
+            os.path.join(repo_dir, ".mini.config.yml"),
+            os.path.join(repo_dir, "default.config.yml"),
+            os.path.join(repo_dir, ".most.config.yml"),
+        ]
+
+    sets = []
+    for path in config_paths:
+        if not os.path.exists(path):
+            sys.stderr.write(f"Error: file not found: {path}\n")
+            sys.exit(1)
+        sets.append(extract_packages(path))
+
+    if not sets:
+        intersection = set()
+    else:
+        intersection = sets[0]
+        for s in sets[1:]:
+            intersection = intersection.intersection(s)
+
+    sorted_pkgs = sorted(intersection)
+
+    if args.format == "lines":
+        if sorted_pkgs:
+            print("\n".join(sorted_pkgs))
+    elif args.format == "space":
+        print(" ".join(sorted_pkgs))
+    elif args.format == "json":
+        print(json.dumps(sorted_pkgs))
+
+
+if __name__ == "__main__":
+    main()

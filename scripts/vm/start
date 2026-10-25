@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPTS_DIR="$(dirname "${BASH_SOURCE[0]}")"
+# shellcheck source=scripts/_common
+source "$SCRIPTS_DIR/../_common"
+# shellcheck source=scripts/_vm
+source "$SCRIPTS_DIR/../_vm"
+
+VM_NAME=${1:-""}
+
+if [[ -z "$VM_NAME" ]]; then
+    echo -e "usage: start ($TART_MACOS_NAME|$TART_LINUX_NAME|<vm-name>)"
+    exit 1
+fi
+
+echo -e "\n${C_HIL}Starting $VM_NAME:${C_RES}"
+vm_start "$VM_NAME"

@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPTS_DIR="$(dirname "${BASH_SOURCE[0]}")"
+# shellcheck source=scripts/_common
+source "$SCRIPTS_DIR/../_common"
+# shellcheck source=scripts/_vm
+source "$SCRIPTS_DIR/../_vm"
+# shellcheck source=scripts/_remote
+source "$SCRIPTS_DIR/../_remote"
+
+TARGET_VM=""
+if [[ $# -gt 0 ]]; then
+    if vm_running "$1" || vm_exists "$1"; then
+        TARGET_VM="$1"
+        shift
+    fi
+fi
+
+if [[ -z "$TARGET_VM" ]]; then
+    TARGET_VM=$(vm_find_running)
+fi
+
+if [[ -z "$TARGET_VM" ]]; then
+    echo -e "\n${C_ERR}No running test VM found!${C_RES}" >&2
+    echo -e "usage: env-setup [vm-name] [args...]" >&2
+    exit 1
+fi
+
+if ! vm_running "$TARGET_VM"; then
+    echo -e "\n${C_ERR}VM $TARGET_VM is not running!${C_RES}" >&2
+    exit 1
+fi
+
+SSH_HOST=$(vm_ip "$TARGET_VM")
+echo -e "\n${C_HIL}Running env-setup on $TARGET_VM ($SSH_HOST):${C_RES}"
+remote_exec "$SSH_HOST" "export ENVSETUP_INTERACT=0 && $ENVSETUP_REMOTE_DIR/scripts/env-setup $*"

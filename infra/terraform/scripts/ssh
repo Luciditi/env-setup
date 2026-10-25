@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+# Set stop on error / enable debug
+set -euo pipefail
+#set -vx
+
+SCRIPTS_DIR="$(dirname "$0")"
+# shellcheck source=scripts/_common
+source "$SCRIPTS_DIR/../../../scripts/_common"
+HOST_TYPE=${1:-"linux"}; if [[ "${1:-""}" != "" ]]; then shift; fi
+
+############################################################################
+# SSH TO HOST
+############################################################################
+
+if [[ ! -x "$(command -v jq)" ]]; then
+    echo -e "\n${C_ERR}jq is required!${C_RES}"
+    exit 1
+fi
+
+HOST_INFO=$(terraform output -json hosts)
+KEY=$(echo "$HOST_INFO" | jq -r ".$HOST_TYPE.key")
+SSH_HOST=$(echo "$HOST_INFO" | jq -r ".$HOST_TYPE.name")
+SSH_USER=$(echo "$HOST_INFO" | jq -r ".$HOST_TYPE.user")
+SSH_CMD="ssh -t -i $KEY $SSH_USER@$SSH_HOST"
+
+echo -e "\n${C_HIL}Starting $HOST_TYPE shell on $SSH_HOST:${C_RES}"
+if [[ $* != "" ]];  then
+    ${SSH_CMD} -C "$*"
+else
+    ${SSH_CMD}
+fi

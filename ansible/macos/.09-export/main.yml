@@ -1,0 +1,105 @@
+---
+- name: Export environment configuration
+  hosts: all
+  gather_facts: true
+  become: false
+
+  vars_files:
+    - ../../../default.config.yml
+
+  vars:
+    export_file: "{{ export_file | default('../../../config.export.yml') }}"
+    export_cargo_packages: []
+    export_homebrew_taps: []
+    export_homebrew_packages: []
+    export_homebrew_casks: []
+    export_mas_apps: []
+    export_vscode_extensions: []
+    export_git_projects: []
+    export_git_vendors: []
+    export_hostname: "{{ ansible_hostname | default('ENV-SETUP-EXPORT') }}"
+
+  tasks:
+    - name: Find brew executable
+      shell: >
+        command -v brew ||
+        ([ -x /home/linuxbrew/.linuxbrew/bin/brew ] && echo /home/linuxbrew/.linuxbrew/bin/brew) ||
+        ([ -x /opt/homebrew/bin/brew ] && echo /opt/homebrew/bin/brew) ||
+        ([ -x /usr/local/bin/brew ] && echo /usr/local/bin/brew) || true
+      register: brew_check
+      changed_when: false
+
+    - name: Dump Homebrew bundle state
+      command: "{{ brew_check.stdout }} bundle dump --file=- --no-restart"
+      register: brew_bundle_dump
+      failed_when: false
+      changed_when: false
+      when: brew_check.stdout | length > 0
+
+    - name: Parse Homebrew bundle state
+      set_fact:
+        export_homebrew_taps: "{{ brew_bundle_dump.stdout | regex_findall('^tap \"([^\"]+)\"', multiline=True) }}"
+        export_homebrew_packages: "{{ brew_bundle_dump.stdout | regex_findall('^brew \"([^\"]+)\"', multiline=True) }}"
+        export_homebrew_casks: "{{ brew_bundle_dump.stdout | regex_findall('^cask \"([^\"]+)\"', multiline=True) }}"
+        export_mas_apps: "{{ brew_bundle_dump.stdout | regex_findall('^mas \"([^\"]+)\", id: ([0-9]+)', multiline=True) }}"
+        export_vscode_extensions: "{{ brew_bundle_dump.stdout | regex_findall('^vscode \"([^\"]+)\"', multiline=True) }}"
+      when: brew_check.stdout | length > 0 and brew_bundle_dump.rc == 0
+
+    - name: Find cargo executable
+      shell: >
+        command -v cargo ||
+        ([ -x "$HOME/.cargo/bin/cargo" ] && echo "$HOME/.cargo/bin/cargo") || true
+      register: cargo_check
+      changed_when: false
+
+    - name: List installed Cargo packages
+      command: "{{ cargo_check.stdout }} install --list"
+      register: cargo_install_list
+      failed_when: false
+      changed_when: false
+      when: cargo_check.stdout | length > 0
+
+    - name: Parse Cargo packages
+      set_fact:
+        export_cargo_packages: "{{ cargo_install_list.stdout | regex_findall('^([a-zA-Z0-9_-]+) v[0-9]', multiline=True) }}"
+      when: cargo_check.stdout | length > 0 and cargo_install_list.rc == 0
+
+    - name: Discover git repositories in project directory
+      shell: |
+        PROJ_DIR="{{ git_repo_project_dir | replace('~', ansible_env.HOME) }}"
+        if [ -d "$PROJ_DIR" ]; then
+          for d in "$PROJ_DIR"/*/.git; do
+            [ -d "$d" ] || continue
+            git -C "$(dirname "$d")" remote get-url origin 2>/dev/null || true
+          done
+        fi
+      register: git_projects_raw
+      failed_when: false
+      changed_when: false
+
+    - name: Parse git project repositories
+      set_fact:
+        export_git_projects: "{{ git_projects_raw.stdout_lines | default([]) }}"
+
+    - name: Discover git repositories in vendors directory
+      shell: |
+        VEND_DIR="{{ git_repo_vendors_dir | replace('~', ansible_env.HOME) }}"
+        if [ -d "$VEND_DIR" ]; then
+          for d in "$VEND_DIR"/*/.git; do
+            [ -d "$d" ] || continue
+            git -C "$(dirname "$d")" remote get-url origin 2>/dev/null || true
+          done
+        fi
+      register: git_vendors_raw
+      failed_when: false
+      changed_when: false
+
+    - name: Parse git vendor repositories
+      set_fact:
+        export_git_vendors: "{{ git_vendors_raw.stdout_lines | default([]) }}"
+
+    - name: Render exported configuration file
+      template:
+        src: templates/config.export.yml.j2
+        dest: "{{ export_file }}"
+        mode: '0644'
