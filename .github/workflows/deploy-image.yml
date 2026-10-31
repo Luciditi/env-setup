@@ -323,6 +323,7 @@ jobs:
 
           git config user.name github-actions
           git config user.email github-actions@github.com
+          git remote set-url origin git@github.com:luciditi/homebrew-tap.git
           git add "Formula/$FORMULA.rb"
           git commit -m "Homebrew: $FORMULA: $TAG"
           git push
