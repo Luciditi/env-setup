@@ -86,4 +86,4 @@ TART_LINUX_IMAGE="ghcr.io/cirruslabs/$TART_LINUX_NAME:latest"
 # baked into the scripts.
 TART_SSH_USER=${TART_SSH_USER:-"admin"}
 TART_SSH_PASS=${TART_SSH_PASS:-"admin"}
-TART_SSH_OPTS=${TART_SSH_OPTS:-"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"}
+TART_SSH_OPTS=${TART_SSH_OPTS:-"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PubkeyAuthentication=no"}
