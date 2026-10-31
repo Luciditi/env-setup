@@ -10,8 +10,8 @@ on:
   push:
     tags:
       # Multi-digit components: the old 'v[0-9].[0-9].[0-9]' could not match
-      # a v2.10.0 style release.
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+      # a v2.10.0 style release. Glob syntax uses * instead of regex +.
+      - 'v[0-9]*.[0-9]*.[0-9]*'
   pull_request:
     paths:
       - 'infra/docker/**'
