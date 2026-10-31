@@ -46,7 +46,8 @@ printline() {
 }
 
 #  Logging functions
-readonly LOG_FILE="/tmp/$(basename "$0").log"
+LOG_FILE="/tmp/$(basename "$0").log"
+readonly LOG_FILE
 info()    { echo -e "[INFO]    $*" | tee -a "$LOG_FILE" >&2 ; }
 warning() { echo -e "[WARNING] $*" | tee -a "$LOG_FILE" >&2 ; }
 error()   { echo -e "[ERROR]   $*" | tee -a "$LOG_FILE" >&2 ; }
@@ -72,13 +73,14 @@ C_ERR='\033[0;31m'
 C_RES='\033[0;37m'
 ENVSETUP_INTERACT=${ENVSETUP_INTERACT:-"1"}
 ENVSETUP_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-ENVSETUP_REPO_HTTPS="https://github.com/Luciditi/env-setup.git"
-ENVSETUP_REPO_SSH="git@github.com:Luciditi/env-setup.git"
+ENVSETUP_INSTALL_BRANCH=${ENVSETUP_INSTALL_BRANCH:-"main"}
+ENVSETUP_CLONE_PROTO=${ENVSETUP_CLONE_PROTO:-"ssh"}
+ENVSETUP_REPO_HTTPS=${ENVSETUP_REPO_HTTPS:-"https://github.com/Luciditi/env-setup.git"}
+ENVSETUP_REPO_SSH=${ENVSETUP_REPO_SSH:-"git@github.com:Luciditi/env-setup.git"}
 ENVSETUP_KEY_FILE=${ENVSETUP_KEY_FILE:-"$HOME/.ssh/id_rsa"}
 ENVSETUP_ID="env-setup:$USER@$(hostname)"
 ENVSETUP_KEY_FILE_COMMENT=${ENVSETUP_KEY_FILE_COMMENT:-"$ENVSETUP_ID"}
 INSTALL_DIR=${ENVSETUP_INSTALL_DIR:-"$HOME/env-setup"}
-TMP_CLI_FILE="/tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress;"
 
 ##}}}#######################################################################
 
@@ -97,7 +99,7 @@ expr "$*" : ".*--help" > /dev/null && usage
 # Add options x: - required arg
 while getopts 'h' FLAG; do
     case "${FLAG}" in
-        h) usage; exit 0 ;;
+        h) usage ;;
         *) : ;;
     esac
 done
@@ -166,33 +168,74 @@ fi
 
 # 4. INIT SHELL
 PUB_KEY=$(cat "$ENVSETUP_KEY_FILE.pub")
-if [[ $ENVSETUP_INTERACT == "1" ]]; then
-    if [ -x "$(command -v pbcopy)" ]; then
-        echo "$PUB_KEY" | pbcopy
-    elif [ -x "$(command -v xclip)" ]; then
-        echo "$PUB_KEY" | xclip -sel clip
-    fi
 
-    echo -e "Please confirm that...\n"
-    echo -e "[ ] $ENVSETUP_REPO_SSH / $ENVSETUP_REPO_HTTPS is accessible"
-    echo -e "[ ] ${C_WAR}$PUB_KEY${C_RES} is allowed for GitHub access
-        (https://github.com/settings/keys)"
-    read -r -p "Continue? (yes/no): " ANSWER; [[ $ANSWER == "yes" ]] || exit 0
-    echo -e "\n"
+# Determine clone protocol and URL
+CLONE_PROTO="$ENVSETUP_CLONE_PROTO"
+if [[ "$CLONE_PROTO" == "https" ]]; then
+    CLONE_URL="$ENVSETUP_REPO_HTTPS"
 else
-    echo -e "${C_WAR}$PUB_KEY${C_RES} needs GitHub access
-        (https://github.com/settings/keys)"
+    # Check if an existing SSH key is associated with a GitHub user
+    SSH_AUTH_OUTPUT=$(ssh -T -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes git@github.com 2>&1 || true)
+    if [[ "$SSH_AUTH_OUTPUT" =~ "successfully authenticated" || "$SSH_AUTH_OUTPUT" =~ "Hi " ]]; then
+        CLONE_PROTO="ssh"
+        CLONE_URL="$ENVSETUP_REPO_SSH"
+    else
+        info "No active GitHub SSH key detected; defaulting clone protocol to HTTPS."
+        CLONE_PROTO="https"
+        CLONE_URL="$ENVSETUP_REPO_HTTPS"
+    fi
 fi
 
+if [[ "$CLONE_PROTO" == "ssh" ]]; then
+    if [[ $ENVSETUP_INTERACT == "1" ]]; then
+        if [ -x "$(command -v pbcopy)" ]; then
+            echo "$PUB_KEY" | pbcopy
+        elif [ -x "$(command -v xclip)" ]; then
+            echo "$PUB_KEY" | xclip -sel clip
+        fi
+
+        echo -e "Please confirm that...\n"
+        echo -e "[ ] $CLONE_URL is accessible"
+        echo -e "[ ] ${C_WAR}$PUB_KEY${C_RES} is allowed for GitHub access
+        (https://github.com/settings/keys)"
+        read -r -p "Continue? (yes/no): " ANSWER; [[ $ANSWER == "yes" ]] || exit 0
+        echo -e "\n"
+    else
+        echo -e "${C_WAR}$PUB_KEY${C_RES} needs GitHub access
+        (https://github.com/settings/keys)"
+    fi
+else
+    if [[ $ENVSETUP_INTERACT == "1" ]]; then
+        if [ -x "$(command -v pbcopy)" ]; then
+            echo "$PUB_KEY" | pbcopy
+        elif [ -x "$(command -v xclip)" ]; then
+            echo "$PUB_KEY" | xclip -sel clip
+        fi
+
+        echo -e "Using HTTPS for env-setup repository (${C_WAR}$CLONE_URL${C_RES}).\n"
+        echo -e "${C_WAR}$PUB_KEY${C_RES} can be added to GitHub later for private repository access."
+        echo -e "    (https://github.com/settings/keys)\n"
+        read -r -p "Continue? (yes/no): " ANSWER; [[ $ANSWER == "yes" ]] || exit 0
+        echo -e "\n"
+    else
+        echo -e "Using HTTPS for env-setup repository ($CLONE_URL)."
+        echo -e "${C_WAR}$PUB_KEY${C_RES} can be added to GitHub later for private repository access."
+        echo -e "    (https://github.com/settings/keys)"
+    fi
+fi
 
 echo -e "${C_HIL}Installing env-setup to $INSTALL_DIR...${C_RES}\n"
 if [[ ! -d "$INSTALL_DIR" ]]; then
-    if [[ $ENVSETUP_INTERACT == "1" ]]; then
-        git clone "$ENVSETUP_REPO_SSH" "$INSTALL_DIR"
-    else
-        export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no"
-        git clone "$ENVSETUP_REPO_SSH" "$INSTALL_DIR"
+    CLONE_CMD=(git clone)
+    if [[ -n "$ENVSETUP_INSTALL_BRANCH" ]]; then
+        CLONE_CMD+=(-b "$ENVSETUP_INSTALL_BRANCH")
     fi
+    CLONE_CMD+=("$CLONE_URL" "$INSTALL_DIR")
+
+    if [[ "$CLONE_PROTO" == "ssh" ]]; then
+        export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no"
+    fi
+    "${CLONE_CMD[@]}"
 fi
 echo -e "\n"
 

@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPTS_DIR="$(dirname "${BASH_SOURCE[0]}")"
+# shellcheck source=scripts/_common
+source "$SCRIPTS_DIR/../_common"
+# shellcheck source=scripts/_vm
+source "$SCRIPTS_DIR/../_vm"
+# shellcheck source=scripts/_remote
+source "$SCRIPTS_DIR/../_remote"
+
+TARGET_OS=${1:-"macos"}
+TARGET_ACTION=${2:-"all"}
+
+case "$TARGET_OS" in
+    macos)
+        BASE_IMAGE="$TART_MACOS_IMAGE"
+        ;;
+    linux)
+        BASE_IMAGE="$TART_LINUX_IMAGE"
+        ;;
+    *)
+        echo -e "usage: test [macos|linux] [all|init|<playbook>]" >&2
+        exit 1
+        ;;
+esac
+
+# Generate guaranteed safe ephemeral name (never matches or touches vpn)
+EPHEMERAL="es-test-${TARGET_OS}-$$"
+
+cleanup() {
+    echo -e "\n${C_WAR}Cleaning up ephemeral VM $EPHEMERAL...${C_RES}"
+    vm_stop "$EPHEMERAL" > /dev/null 2>&1 || true
+    vm_delete "$EPHEMERAL" > /dev/null 2>&1 || true
+}
+trap cleanup EXIT
+
+echo -e "\n${C_HIL}Creating ephemeral test VM $EPHEMERAL from $BASE_IMAGE...${C_RES}"
+vm_create "$EPHEMERAL" "$BASE_IMAGE"
+
+echo -e "\n${C_HIL}Starting $EPHEMERAL headless...${C_RES}"
+tart run --no-graphics "$EPHEMERAL" &
+
+echo -e "\n${C_HIL}Waiting for IP from $EPHEMERAL...${C_RES}"
+SSH_HOST=$(vm_ip "$EPHEMERAL" 120)
+
+if [[ -z "$SSH_HOST" ]]; then
+    echo -e "\n${C_ERR}Failed to obtain IP for $EPHEMERAL within 120s!${C_RES}" >&2
+    exit 1
+fi
+
+echo -e "\n${C_SUC}VM $EPHEMERAL ready at $SSH_HOST.${C_RES}"
+
+# Sync repository code to guest
+echo -e "\n${C_HIL}Syncing repository to guest...${C_RES}"
+remote_exec "$SSH_HOST" "mkdir -p ~/env-setup"
+remote_copy "$INSTALL_DIR/" "$SSH_HOST" "env-setup/"
+
+# Test bootstrap init if requested
+if [[ "$TARGET_ACTION" == "init" || "$TARGET_ACTION" == "all" ]]; then
+    echo -e "\n${C_HIL}Testing bootstrap init script...${C_RES}"
+    remote_exec "$SSH_HOST" "export ENVSETUP_INTERACT=0 && ~/env-setup/scripts/init"
+    echo -e "${C_SUC}Bootstrap init test passed.${C_RES}"
+fi
+
+# Test playbook execution & idempotency if requested
+PLAYBOOK=""
+if [[ "$TARGET_ACTION" == "all" ]]; then
+    PLAYBOOK=".00-init"
+elif [[ "$TARGET_ACTION" != "init" ]]; then
+    PLAYBOOK="$TARGET_ACTION"
+fi
+
+if [[ -n "$PLAYBOOK" ]]; then
+    echo -e "\n${C_HIL}Testing playbook $PLAYBOOK (Run 1)...${C_RES}"
+    remote_exec "$SSH_HOST" "export ENVSETUP_INTERACT=0 ANSIBLE_SUDO=-n && ~/env-setup/scripts/env-setup $PLAYBOOK"
+
+    echo -e "\n${C_HIL}Testing idempotency for playbook $PLAYBOOK (Run 2)...${C_RES}"
+    OUT=$(remote_exec "$SSH_HOST" "export ENVSETUP_INTERACT=0 ANSIBLE_SUDO=-n ANSIBLE_STDOUT_CALLBACK=json && ~/env-setup/scripts/env-setup $PLAYBOOK")
+
+    # Extract JSON stats block and sum changed tasks
+    CHANGED_COUNT=$(echo "$OUT" | jq -r '[.stats[]?.changed // 0] | add // 0' 2>/dev/null || echo "error")
+
+    if [[ "$CHANGED_COUNT" != "0" ]]; then
+        echo -e "\n${C_ERR}Idempotency check failed: $CHANGED_COUNT changed tasks reported in Run 2!${C_RES}" >&2
+        exit 1
+    fi
+
+    echo -e "${C_SUC}Playbook $PLAYBOOK passed idempotency check (0 changed tasks).${C_RES}"
+fi
+
+echo -e "\n${C_SUC}E2E test run on $TARGET_OS completed successfully!${C_RES}"

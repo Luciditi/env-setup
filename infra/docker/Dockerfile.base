@@ -1,0 +1,53 @@
+# syntax=docker/dockerfile:1
+ARG VER=24.04
+
+FROM ubuntu:${VER} AS base
+ENV USER=user
+ARG PASS=password
+ENV TZ=Etc/UTC \
+    DEBIAN_FRONTEND=noninteractive
+ENV HOMEBREW_NO_AUTO_UPDATE=1 \
+    HOMEBREW_NO_INSTALL_CLEANUP=1 \
+    HOMEBREW_NO_ANALYTICS=1 \
+    HOMEBREW_NO_ENV_HINTS=1
+ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:${PATH}"
+
+RUN apt-get update \
+  && apt-get install -y software-properties-common \
+  && apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    libnotify-bin \
+    python3 \
+    python3-apt \
+    sudo \
+    vim \
+  && add-apt-repository --yes --update ppa:ansible/ansible \
+  && apt-get install -y ansible \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -p "$(openssl passwd -1 ${PASS})" -rm -d "/home/${USER}" -s /bin/bash -g root -G sudo -u 1001 "${USER}"
+RUN mkdir -p /home/${USER}/.ssh && \
+    ssh-keyscan github.com >> /home/${USER}/.ssh/known_hosts && \
+    sudo chmod -R 744 /home/${USER}/.ssh && \
+    sudo chown -R ${USER}:root /home/${USER}/.ssh
+RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+USER ${USER}
+WORKDIR /home/${USER}
+SHELL ["/bin/bash", "-c"]
+
+# Install Linuxbrew
+RUN NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" \
+  && (echo; echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"') >> "/home/${USER}/.bash_profile" \
+  && (echo; echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"') >> "/home/${USER}/.bashrc" \
+  && (echo; echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"') >> "/home/${USER}/.zshrc"
+
+# Pre-install Ansible Galaxy requirements
+RUN ansible-galaxy role install geerlingguy.dotfiles \
+  && ansible-galaxy collection install community.general
+
+# Pre-install common formula intersection (mini ∩ default ∩ most) + 02-cli essentials
+ARG WARM_FORMULAE="gcc docker ansible antigen composer direnv fzf go node pipx python rg ruby rust tmate vim zsh"
+RUN /home/linuxbrew/.linuxbrew/bin/brew install ${WARM_FORMULAE}

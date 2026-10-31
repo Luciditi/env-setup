@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# Shared library for Tart VM management. Sourced, never run directly.
+#
+# shellcheck disable=SC2034
+
+_VM_DIR="$(dirname "${BASH_SOURCE[0]}")"
+# shellcheck source=scripts/_common
+source "$_VM_DIR/_common"
+
+vm_require_tart() {
+    if ! command -v tart > /dev/null 2>&1; then
+        echo -e "\n${C_ERR}tart is required!${C_RES}" >&2
+        echo -e "\nrun ${C_WAR}brew install cirruslabs/cli/tart${C_RES}" >&2
+        return 1
+    fi
+}
+
+vm_require_jq() {
+    if ! command -v jq > /dev/null 2>&1; then
+        echo -e "\n${C_ERR}jq is required!${C_RES}" >&2
+        echo -e "\nrun ${C_WAR}brew install jq${C_RES}" >&2
+        return 1
+    fi
+}
+
+vm_exists() {
+    local name="$1"
+    vm_require_tart || return 1
+    vm_require_jq || return 1
+    tart list --source local --format json | jq -er --arg n "$name" 'map(select(.Name==$n))|length>0' > /dev/null 2>&1
+}
+
+vm_running() {
+    local name="$1"
+    vm_require_tart || return 1
+    vm_require_jq || return 1
+    tart list --source local --format json | jq -er --arg n "$name" 'map(select(.Name==$n and .State=="running"))|length>0' > /dev/null 2>&1
+}
+
+vm_find_running() {
+    vm_require_tart || return 1
+    vm_require_jq || return 1
+    tart list --source local --format json | jq -r 'map(select(.State=="running" and .Name != "vpn")) | .[0].Name // empty' 2> /dev/null
+}
+
+vm_ip() {
+    local name="$1"
+    local wait="${2:-""}"
+    vm_require_tart || return 1
+    if [[ -n "$wait" ]]; then
+        tart ip "$name" --wait "$wait"
+    else
+        tart ip "$name"
+    fi
+}
+
+vm_start() {
+    local name="$1"
+    shift || true
+    vm_require_tart || return 1
+    tart run --vnc "$@" "$name" &
+}
+
+vm_stop() {
+    local name="$1"
+    vm_require_tart || return 1
+    tart stop "$name"
+}
+
+vm_create() {
+    local name="$1"
+    local image="$2"
+    local disk_size="${3:-""}"
+    vm_require_tart || return 1
+    tart clone "$image" "$name"
+    if [[ -n "$disk_size" ]]; then
+        tart set "$name" --disk-size "$disk_size"
+    fi
+}
+
+vm_delete() {
+    local name="$1"
+    vm_require_tart || return 1
+    tart delete "$name"
+}

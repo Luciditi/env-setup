@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# Shared library for remote Tart VM SSH/SCP operations.
+# Sourced, never run directly.
+#
+# shellcheck disable=SC2034
+
+_REMOTE_DIR="$(dirname "${BASH_SOURCE[0]}")"
+# shellcheck source=scripts/_common
+source "$_REMOTE_DIR/_common"
+
+remote_require_sshpass() {
+    if ! command -v sshpass > /dev/null 2>&1; then
+        echo -e "\n${C_ERR}sshpass is required!${C_RES}" >&2
+        echo -e "\nrun ${C_WAR}brew install cirruslabs/cli/sshpass${C_RES}" >&2
+        return 1
+    fi
+}
+
+remote_exec() {
+    local host="$1"
+    shift || true
+    remote_require_sshpass || return 1
+    if [[ $# -gt 0 ]]; then
+        # shellcheck disable=SC2086
+        sshpass -p "$TART_SSH_PASS" ssh $TART_SSH_OPTS "$TART_SSH_USER@$host" "$@"
+    else
+        # shellcheck disable=SC2086
+        sshpass -p "$TART_SSH_PASS" ssh $TART_SSH_OPTS "$TART_SSH_USER@$host"
+    fi
+}
+
+remote_copy() {
+    local src="$1"
+    local host="$2"
+    local dst="$3"
+    remote_require_sshpass || return 1
+    # shellcheck disable=SC2086
+    sshpass -p "$TART_SSH_PASS" scp -r $TART_SSH_OPTS "$src" "$TART_SSH_USER@$host:$dst"
+}

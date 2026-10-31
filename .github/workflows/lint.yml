@@ -1,0 +1,80 @@
+---
+name: lint
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - 'infra/terraform/scripts/**'
+      - 'ansible/**'
+      - '*.yml'
+      - '*.yaml'
+      - '.shellcheckrc'
+      - '.yamllint.yml'
+      - '.ansible-lint'
+      - '.pre-commit-config.yaml'
+      - '.github/workflows/lint.yml'
+  push:
+    branches:
+      - main
+      - v3
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # ratchet:actions/checkout@v4
+      - name: Run ShellCheck
+        run: |
+          set -euo pipefail
+          mapfile -t SCRIPTS < <(git grep -lE '^#!(/usr/bin/env bash|/bin/bash)' || true)
+          SCRIPTS+=("scripts/aliases")
+          shellcheck -x "${SCRIPTS[@]}"
+
+  yamllint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # ratchet:actions/checkout@v4
+      - name: Install yamllint
+        run: pip install yamllint
+      - name: Run yamllint
+        run: yamllint -c .yamllint.yml .
+
+  ansible-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # ratchet:actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # ratchet:actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install ansible and ansible-lint
+        run: pip install ansible-core ansible-lint
+      - name: Install ansible requirements
+        run: |
+          ansible-galaxy install -r ansible/macos/.00-init/requirements.yml
+          ansible-galaxy install -r ansible/linux/.00-init/requirements.yml
+      - name: Run ansible-lint per playbook directory
+        run: |
+          set -euo pipefail
+          find ansible -name main.yml | while read -r pb; do
+            dir="$(dirname "$pb")"
+            echo "Linting playbook directory: $dir"
+            (cd "$dir" && ansible-lint main.yml)
+          done
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # ratchet:actions/checkout@v4
+      - name: Install Bats
+        run: sudo apt-get install -y bats
+      - name: Run Bats Tests
+        run: bats tests

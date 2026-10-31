@@ -1,22 +1,30 @@
 #!/usr/bin/env bash
-
-# Set stop on error / enable debug
-set -euo pipefail
-#set -vx
+# shellcheck shell=bash
+#
+# Shared library for the env-setup scripts. This file is SOURCED, never run.
+#
+# Sourcing it must not change the caller's shell options: each entrypoint sets
+# its own `set -euo pipefail`. Keeping it out of here also lets the test suite
+# source this file without `errexit` leaking into the test shell.
+#
+# File-level SC2034: every variable here is consumed by the scripts that
+# source this file, which the linter cannot see when checking it standalone.
+# shellcheck disable=SC2034
 
 ##{{{#######################################################################
 ############################################################################
 # FUNCTIONS
 ############################################################################
 
-# Clean Upon Exit
-cleanup() {
-    :
+# Resolve a path to its absolute form.
+# Portable across macOS/Linux so that callers on either OS agree on the result.
+abspath() {
+    if [[ -d "$1" ]]; then
+        (cd "$1" && pwd)
+    else
+        printf '%s/%s\n' "$(cd "$(dirname "$1")" && pwd)" "$(basename "$1")"
+    fi
 }
-if [[ "${BASH_SOURCE[0]}" = "$0" ]]; then
-    trap cleanup EXIT
-fi
-
 
 # Print a string line wrapped in "===" headers
 printline() {
@@ -26,7 +34,9 @@ printline() {
 }
 
 #  Logging functions
-readonly LOG_FILE="/tmp/$(basename "$0").log"
+# NOTE: not `readonly` -- sourcing this file twice in one shell (as the test
+# suite does) would otherwise abort on the second assignment.
+LOG_FILE="/tmp/$(basename "$0").log"
 info()    { echo -e "[INFO]    $*" | tee -a "$LOG_FILE" >&2 ; }
 warning() { echo -e "[WARNING] $*" | tee -a "$LOG_FILE" >&2 ; }
 error()   { echo -e "[ERROR]   $*" | tee -a "$LOG_FILE" >&2 ; }
@@ -41,6 +51,8 @@ quit() {
     echo -e "$MESSAGE" 1>&2; exit "$ERROR_CODE";
 }
 
+##}}}#######################################################################
+
 ############################################################################
 # VARS
 ############################################################################
@@ -52,13 +64,26 @@ C_ERR='\033[0;31m'
 C_RES='\033[0;37m'
 ENVSETUP_INTERACT=${ENVSETUP_INTERACT:-"1"}
 ENVSETUP_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-ENVSETUP_DIR="$(dirname "$(dirname "$(realpath "$0")")")"
+
+# Resolve the install root from THIS file's location, not from "$0".
+# "$0" is the *sourcing* script, so a nested caller (scripts/vm/ssh,
+# infra/terraform/scripts/ssh) would otherwise resolve ENVSETUP_DIR to its own
+# parent directory instead of the repo root.
+SCRIPTS_ROOT="$(abspath "$(dirname "${BASH_SOURCE[0]}")")"
+ENVSETUP_DIR="$(dirname "$SCRIPTS_ROOT")"
 INSTALL_DIR=${ENVSETUP_INSTALL_DIR:-"$ENVSETUP_DIR"}
-TART_MACOS_NAME=${TART_MACOS_NAME:-"tahoe-vanilla"}
+
+# Path to env-setup inside a test VM / remote host.
+ENVSETUP_REMOTE_DIR=${ENVSETUP_REMOTE_DIR:-"\$HOME/env-setup"}
+
+TART_MACOS_NAME=${TART_MACOS_NAME:-"tahoe-base"}
 TART_LINUX_NAME=${TART_LINUX_NAME:-"ubuntu"}
 # https://github.com/orgs/cirruslabs/packages?repo_name=macos-image-templates
 TART_MACOS_IMAGE="ghcr.io/cirruslabs/macos-$TART_MACOS_NAME:latest"
 # https://github.com/orgs/cirruslabs/packages?repo_name=linux-image-templates
 TART_LINUX_IMAGE="ghcr.io/cirruslabs/$TART_LINUX_NAME:latest"
-
-##}}}#######################################################################
+# Credentials for the throwaway Tart test VMs. Overridable so they are not
+# baked into the scripts.
+TART_SSH_USER=${TART_SSH_USER:-"admin"}
+TART_SSH_PASS=${TART_SSH_PASS:-"admin"}
+TART_SSH_OPTS=${TART_SSH_OPTS:-"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PubkeyAuthentication=no"}

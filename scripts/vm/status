@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPTS_DIR="$(dirname "${BASH_SOURCE[0]}")"
+# shellcheck source=scripts/_common
+source "$SCRIPTS_DIR/../_common"
+# shellcheck source=scripts/_vm
+source "$SCRIPTS_DIR/../_vm"
+
+VM_NAME=${1:-""}
+
+if [[ -n "$VM_NAME" ]]; then
+    if vm_running "$VM_NAME"; then
+        IP=$(vm_ip "$VM_NAME" 2> /dev/null || echo "unknown")
+        echo -e "$VM_NAME: ${C_SUC}running${C_RES} (IP: $IP)"
+    elif vm_exists "$VM_NAME"; then
+        echo -e "$VM_NAME: ${C_WAR}stopped${C_RES}"
+    else
+        echo -e "$VM_NAME: ${C_ERR}not found${C_RES}"
+        exit 1
+    fi
+else
+    echo -e "${C_HIL}Tart VMs:${C_RES}"
+    vm_require_tart
+    vm_require_jq
+    tart list --source local
+fi

@@ -1,0 +1,7 @@
+---
+profile: min
+verbosity: 1
+exclude_paths:
+  - .github/
+  - .beads/
+  - tmp/

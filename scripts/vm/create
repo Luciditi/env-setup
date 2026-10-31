@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPTS_DIR="$(dirname "${BASH_SOURCE[0]}")"
+# shellcheck source=scripts/_common
+source "$SCRIPTS_DIR/../_common"
+# shellcheck source=scripts/_vm
+source "$SCRIPTS_DIR/../_vm"
+
+TARGET=${1:-"all"}
+
+case "$TARGET" in
+    macos)
+        echo -e "\n${C_HIL}Create macos VM:${C_RES}"
+        vm_create "$TART_MACOS_NAME" "$TART_MACOS_IMAGE" 60
+        echo -e "\nrun ${C_WAR}env-setup vm start $TART_MACOS_NAME${C_RES} to start VM"
+        ;;
+    linux)
+        echo -e "\n${C_HIL}Create linux VM:${C_RES}"
+        vm_create "$TART_LINUX_NAME" "$TART_LINUX_IMAGE" 50
+        echo -e "\nrun ${C_WAR}env-setup vm start $TART_LINUX_NAME${C_RES} to start VM"
+        ;;
+    all|"")
+        echo -e "\n${C_HIL}Create macos VM:${C_RES}"
+        vm_create "$TART_MACOS_NAME" "$TART_MACOS_IMAGE" 60
+        echo -e "\n${C_HIL}Create linux VM:${C_RES}"
+        vm_create "$TART_LINUX_NAME" "$TART_LINUX_IMAGE" 50
+        echo -e "\nrun ${C_WAR}env-setup vm start ($TART_MACOS_NAME|$TART_LINUX_NAME)${C_RES} to start VM"
+        ;;
+    *)
+        echo -e "usage: create [macos|linux|all]"
+        exit 1
+        ;;
+esac

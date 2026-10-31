@@ -1,8 +1,8 @@
-name: terraform-checks 
+name: terraform-checks
 
 env:
   ENVSETUP_REPO_SSH: ${{ github.event.inputs.repo || 'git@github.com:Luciditi/env-setup.git' }}
-  ENVSETUP_CONFIG: ${{ github.event.inputs.config || 'docker/default.config.yml' }}
+  ENVSETUP_CONFIG: ${{ github.event.inputs.config || 'default.config.yml' }}
   ENVSETUP_VERSION: ${{ github.event.inputs.version || '' }}
 
 on:
@@ -11,8 +11,8 @@ on:
   workflow_dispatch:
 
 permissions:
-      contents: write
-      id-token: write
+  contents: write
+  id-token: write
 
 concurrency:
   group: pr-${{ github.head_ref }}
@@ -22,12 +22,12 @@ jobs:
   tf-changes:
     runs-on: ubuntu-latest
     steps:
-        - name: Check TF Changes
-          id: changed
-          uses: tj-actions/changed-files@v45
-          with:
-            files: |
-              terraform/**
+      - name: Check TF Changes
+        id: changed
+        uses: tj-actions/changed-files@48d8f15b2aaa3d255ca5af3eba4870f807ce6b3c  # ratchet:tj-actions/changed-files@v45
+        with:
+          files: |
+            infra/terraform/**
     outputs:
       any_changed: ${{ steps.changed.outputs.any_changed }}
 
@@ -37,14 +37,14 @@ jobs:
     if: needs.tf-changes.outputs.any_changed == 'true'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # ratchet:actions/checkout@v4
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
       - name: Render README.md
-        uses: terraform-docs/gh-actions@v1.2.0
+        uses: terraform-docs/gh-actions@e47bfa196e79fa50987ef391be236d9d97b0c786  # ratchet:terraform-docs/gh-actions@v1.2.0
         with:
-          working-dir: terraform
+          working-dir: infra/terraform
           output-file: README.md
           config-file: .terraform-docs.yml
           output-method: replace
@@ -56,20 +56,20 @@ jobs:
     if: needs.tf-changes.outputs.any_changed == 'true'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # ratchet:actions/checkout@v4
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
       - name: Terraform Format
-        uses: dflook/terraform-fmt@v1
+        uses: dflook/terraform-fmt@c6e82d524f3ef6f84ba00b8fec05940c4b60bbed  # ratchet:dflook/terraform-fmt@v1
         with:
-          path: terraform
+          path: infra/terraform
       - name: Commit format changes
-        uses: EndBug/add-and-commit@v9
+        uses: EndBug/add-and-commit@a94899bca583c204427a224a7af87c02f9b325d5  # ratchet:EndBug/add-and-commit@v9
         with:
           default_author: github_actions
           message: Format `*.tf` to canonical format via `tf fmt`.
-          add: 'terraform/*.tf'
+          add: 'infra/terraform/*.tf'
 
   tf-plan:
     runs-on: ubuntu-latest
@@ -77,16 +77,16 @@ jobs:
     if: needs.tf-changes.outputs.any_changed == 'true'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # ratchet:actions/checkout@v4
       - name: Install Terraform CLI
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd  # ratchet:hashicorp/setup-terraform@v3
       - name: Initialize Terraform
         run: terraform init
-        working-directory: ./terraform
+        working-directory: ./infra/terraform
       - name: Terraform Plan
         if: false
         run: terraform plan
-        working-directory: ./terraform
+        working-directory: ./infra/terraform
 
   tf-sec:
     runs-on: ubuntu-latest
@@ -94,13 +94,11 @@ jobs:
     if: needs.tf-changes.outputs.any_changed == 'true'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # ratchet:actions/checkout@v4
       - name: Terraform Sec Scan
-        uses: aquasecurity/tfsec-pr-commenter-action@v1.3.1
+        uses: aquasecurity/tfsec-action@b466648d6e39e7c75324f25d83891162a721f2d6  # ratchet:aquasecurity/tfsec-action@v1.0.3
         with:
-          working_directory: 'terraform'
-          github_token: ${{ github.token }}
-          soft_fail_commenter: true
+          working_directory: 'infra/terraform'
 
   tf-validate:
     runs-on: ubuntu-latest
@@ -108,12 +106,12 @@ jobs:
     if: needs.tf-changes.outputs.any_changed == 'true'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # ratchet:actions/checkout@v4
       - name: Terraform Validate
-        uses: dflook/terraform-validate@v1
+        uses: dflook/terraform-validate@cfdea12135be7eb8960fbb272fb2f99c63a872f1  # ratchet:dflook/terraform-validate@v1
         id: validate
         with:
-          path: terraform
+          path: infra/terraform
       - name: Validation Failed
         if: ${{ failure() && steps.validate.outputs.failure-reason == 'validate-failed' }}
         run: echo "terraform validate failed"

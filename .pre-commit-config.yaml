@@ -1,0 +1,32 @@
+---
+repos:
+  - repo: https://github.com/koalaman/shellcheck-precommit
+    rev: v0.10.0
+    hooks:
+      - id: shellcheck
+        args: ["-x"]
+        files: "^(scripts/|infra/terraform/scripts/)"
+        types_or: [shell, bash, text]
+        exclude: "^.*\\.(md|yml|yaml|json|toml|xml|txt|ini)$"
+
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        args: [-c, .yamllint.yml, --no-warnings]
+
+  - repo: local
+    hooks:
+      - id: ansible-lint
+        name: ansible-lint
+        entry: bash -c 'export PATH="$HOME/.local/bin:$PATH"; for f in "$@"; do (cd "$(dirname "$f")" && ansible-lint "$(basename "$f")"); done' --
+        language: system
+        files: '^ansible/.*main\.ya?ml$'
+        pass_filenames: true
+
+      - id: bats
+        name: bats tests
+        entry: bats tests
+        language: system
+        pass_filenames: false
+        files: "^(scripts/|tests/)"

@@ -29,12 +29,12 @@ should only run once (a `.init` file is placed here as marker to note this).
 All other playbooks can be ran multiple times as needed by user.
 
 ### Docker
-The `docker` [directory](docker) is a configuration directory for building an 
+The `docker` [directory](infra/docker) is a configuration directory for building an 
 Ubuntu linux image with `env-setup` installed. Additional configuration files 
 are included. 
 
 ### Router
-The `router` [directory](router) is a [Hono](https://hono.dev/) URL router that delivers 
+The `router` [directory](infra/router) is a [Hono](https://hono.dev/) URL router that delivers 
 a init bash script when `https://example.com/env-setup` is requested in a 
 `curl` command. 
 
@@ -62,12 +62,45 @@ run the bash scripting & Ansible playbook with the verbose flag. If you need
 to do further debugging with the playbook tasks, refer to the Ansible 
 docs on [debugging playbooks](https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_debugger.html).
 
-## Testing
-The `terraform` [directory](terraform) is a basic Terraform module that will stand up a SSH 
-key and Linux (Ubuntu 20) & macOS (Ventura) EC2 VMs. 
+## Testing & Quality Gates
 
-Once built, there are a few [scripts](terraform/scripts) that can be used to 
-test running `env-setup` in a new environment.
+`env-setup` includes a comprehensive automated test harness and multi-layer quality gates.
 
-The `vm` [directory](vm) has a couple of [scripts](vm/scripts) that can be used
-to test running `env-setup` in [Tart](https://tart.run/).
+### Bats Test Suite
+
+The test suite in [`tests/`](tests) uses [Bats](https://github.com/bats-core/bats-core) to test CLI dispatch, configuration resolution, regressions, VM subcommands, formula intersection, and config export:
+
+```bash
+bats tests/
+```
+
+### Linters & Pre-Commit
+
+All shell scripts, YAML files, and Ansible playbooks are verified with pre-commit hooks:
+
+```bash
+pre-commit run --all-files
+```
+
+Individual checks:
+- **ShellCheck**: `shellcheck -x scripts/env-setup scripts/_vm scripts/_remote scripts/vm/* infra/terraform/scripts/*`
+- **YAML Lint**: `yamllint -c .yamllint.yml .github/workflows/*.yml *.config.yml`
+- **Ansible Lint**: `ansible-lint`
+
+### Local VM Testing (Tart)
+
+Local macOS and Linux VM testing uses [Tart](https://tart.run/) and the `env-setup vm` subcommands:
+
+- `env-setup vm warm [name]`: Pre-installs the warm package intersection and Galaxy requirements in a VM.
+- `env-setup vm test [macos|linux] [target]`: Clones an ephemeral Copy-on-Write VM (`es-test-*`), executes playbooks or bootstrap `init`, asserts idempotency (`changed == 0`), and automatically tears down the VM upon completion.
+
+### Base Image & Package Intersection
+
+The Linux container builds use a pre-warmed base container artifact:
+- `scripts/formula-intersection`: Computes common Homebrew packages across configuration presets (`.mini`, `default`, `.most`).
+- `infra/docker/Dockerfile.base`: Pre-builds and caches the warm base with Ubuntu 24.04, Linuxbrew, Galaxy roles, and common formulae.
+- `infra/docker/Dockerfile`: Inherits from `Dockerfile.base`, reducing matrix build times in CI.
+
+### Remote VM Testing (Terraform)
+
+The `infra/terraform` [directory](infra/terraform) contains a Terraform module to provision EC2 instances (Ubuntu 24.04 and macOS) for remote AWS validation. Use the [scripts](infra/terraform/scripts) to run tests against remote AWS instances.

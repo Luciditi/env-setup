@@ -29,7 +29,7 @@ set -euo pipefail
 #/   --help/-h: Display this help message
 SCRIPT=$(basename "$0")
 SCRIPTS_DIR="$(dirname "$0")"
-# shellcheck source=/dev/null
+# shellcheck source=scripts/_common
 source "$SCRIPTS_DIR/_common"
 usage() {
     grep '^#/' "$0" | cut -c4- | sed -e "s/\$SCRIPT/$SCRIPT/g" ; exit 0 ;
@@ -40,7 +40,7 @@ expr "$*" : ".*--help" > /dev/null && usage
 # Add options x: - required arg
 while getopts 'huv' FLAG; do
     case "${FLAG}" in
-        h) usage; exit 0 ;;
+        h) usage ;;
         *) : ;;
     esac
 done
@@ -56,15 +56,14 @@ PLAYBOOK_NAME=${1:-""}
 
 case "$ENVSETUP_OS" in
     "darwin"* )
-        ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" \
-            && pwd)/$(basename "${BASH_SOURCE[0]}")"
-        PLAYBOOK_DIR="$(dirname "$(dirname "$ABSOLUTE_PATH")")/ansible"
+        PLAYBOOK_DIR="$ENVSETUP_DIR/ansible"
         ;;
     "linux"* )
-        if [[ $SUGGEST_ANSIBLE == "1" ]]; then
-            "$SCRIPTS_DIR/linux/install-ansible"
-        fi
-        PLAYBOOK_DIR="$(dirname "$(realpath "$SCRIPTS_DIR")")/ansible"
+        # No install-ansible call here: SUGGEST_ANSIBLE is never set in this
+        # script, so referencing it aborted under `set -u` and made
+        # add-playbook unusable on Linux. Installing Ansible is env-setup's
+        # job, not the scaffolder's.
+        PLAYBOOK_DIR="$ENVSETUP_DIR/ansible"
         ;;
     * )
         echo -e "${C_WAR}Unsupported OS${C_RES}\n"
@@ -73,8 +72,10 @@ case "$ENVSETUP_OS" in
 esac
 
 if [[ -z "$PLAYBOOK_NAME" ]]; then
+    # usage() exits 0, so calling it here reported SUCCESS on a usage error
+    # and left the `exit 1` below unreachable.
     echo -e "${C_ERR}Enter a playbook name.${C_RES}\n"
-    usage
+    grep '^#/' "$0" | cut -c4- | sed -e "s/\$SCRIPT/$SCRIPT/g"
     exit 1
 else
     if [[ ! -d "$PLAYBOOK_DIR/linux/$PLAYBOOK_NAME/" ]]; then

@@ -1,28 +1,41 @@
+---
 name: deploy-image
 
 env:
   ENVSETUP_REPO_SSH: ${{ github.event.inputs.repo || 'git@github.com:Luciditi/env-setup.git' }}
   ENVSETUP_DOTFILES_REPO_SSH: ${{ github.event.inputs.dotfiles_repo || 'git@github.com:Luciditi/env-setup-dotfiles.git' }}
   ENVSETUP_DOTFILES_PRV_REPO_SSH: ${{ github.event.inputs.dotfiles_prv_repo || 'git@github.com:Luciditi/env-setup-dotfiles.git' }}
-  ENVSETUP_CONFIG: ${{ github.event.inputs.config || 'docker/default.config.yml' }}
-  ENVSETUP_VERSION: ${{ github.event.inputs.version || '' }}
 
 on:
   push:
     tags:
-      - 'v[0-9].[0-9].[0-9]'
+      # Multi-digit components: the old 'v[0-9].[0-9].[0-9]' could not match
+      # a v2.10.0 style release.
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  pull_request:
+    paths:
+      - 'infra/docker/**'
+      - 'ansible/**'
+      - 'scripts/**'
+      - '*.config.yml'
+      - '.github/workflows/deploy-image.yml'
+  schedule:
+    # Weekly drift check -- upstream formulae and base images move even when
+    # this repo does not.
+    - cron: '17 6 * * 1'
   workflow_dispatch:
     inputs:
       config:
         type: choice
         description: "The configuration manifest used for running env-setup."
-        options: 
-          - 'docker/default.config.yml'
-          - 'docker/.mini.config.yml'
-          - 'docker/.most.config.yml'
-          - 'docker/.none.config.yml'
+        options:
+          - 'all'
+          - 'default.config.yml'
+          - '.mini.config.yml'
+          - '.most.config.yml'
+          - '.none.config.yml'
         required: true
-        default: 'docker/default.config.yml'
+        default: 'default.config.yml'
       version:
         description: "The env-setup version tag."
         required: true
@@ -44,72 +57,171 @@ on:
         description: "Tag as latest."
         default: false
 
+concurrency:
+  group: deploy-image-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
 jobs:
-  dispatch-builds:
-    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+  # Resolve WHICH configs to build, the version string, and whether to push.
+  # Replaces the old `gh workflow run` fan-out, which started four SEPARATE
+  # workflow runs -- so the tag's own run went green in ~11s while the four
+  # children failed unnoticed.
+  setup:
     runs-on: ubuntu-latest
-    permissions:
-      actions: write
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      version: ${{ steps.plan.outputs.version }}
+      push: ${{ steps.plan.outputs.push }}
+      base_hash: ${{ steps.plan.outputs.base_hash }}
+      base_image: ${{ steps.plan.outputs.base_image }}
+      repo: ${{ steps.plan.outputs.repo }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          path: ./env-setup
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # ratchet:actions/checkout@v4
 
-      - name: Checkout Homebrew tap repo
-        uses: actions/checkout@v4
-        with:
-          repository: luciditi/homebrew-tap
-          token: ${{ github.token }}
-          path: ./homebrew-tap
-
-      - name: Dispatch ${{ github.ref_name }} Builds
+      - name: Plan builds
+        id: plan
+        shell: bash
         run: |
-          gh workflow run "deploy-image.yml" -f config="docker/.none.config.yml" -f version="${TAG:1}" latest=false --ref "$(git symbolic-ref --short -q HEAD)"
-          gh workflow run "deploy-image.yml" -f config="docker/.mini.config.yml" -f version="${TAG:1}" latest=false --ref "$(git symbolic-ref --short -q HEAD)"
-          gh workflow run "deploy-image.yml" -f config="docker/default.config.yml" -f version="${TAG:1}" latest=true --ref "$(git symbolic-ref --short -q HEAD)"
-          gh workflow run "deploy-image.yml" -f config="docker/.most.config.yml" -f version="${TAG:1}" latest=false --ref "$(git symbolic-ref --short -q HEAD)"
-        env:
-          TAG: ${{ github.ref_name }}
-          GH_TOKEN: ${{ github.token }}
-        working-directory: ./env-setup
+          set -euo pipefail
+          EVENT="${{ github.event_name }}"
+          SELECTED="${{ github.event.inputs.config || 'all' }}"
+          BASE_HASH="${{ hashFiles('infra/docker/Dockerfile.base', 'scripts/formula-intersection', '.mini.config.yml', 'default.config.yml', '.most.config.yml') }}"
+          REPO="ghcr.io/${{ github.repository }}"
+          REPO_LOWER="${REPO,,}"
+          BASE_IMAGE="${REPO_LOWER}:base-${BASE_HASH}"
 
-      - name: Setup deploy key
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-            ssh-private-key: ${{ secrets.HOMEBREW_TAPS_SSH_KEY }}
+          # Per-config timeouts sized to the measured cost of each manifest.
+          none='{"config":"none","file":".none.config.yml","timeout":15}'
+          mini='{"config":"mini","file":".mini.config.yml","timeout":25}'
+          default='{"config":"default","file":"default.config.yml","timeout":30}'
+          most='{"config":"most","file":".most.config.yml","timeout":45}'
 
-      - name: Create env-setup Brew Formula release
-        run: |
-          export RELEASE_URL="https://github.com/$REPO/archive/refs/tags/$TAG.tar.gz"
-          export SHA256=$(openssl sha256 <(curl -sL "$RELEASE_URL") | cut -d' ' -f2)
-          envsubst '$RELEASE_URL,$SHA256' < "Formula/.templates/.$FORMULA.tpl" > "Formula/$FORMULA.rb"
+          case "$EVENT" in
+            pull_request)
+              # `none` proves the scaffolding; `mini` is the cheapest config
+              # that actually exercises Homebrew -- which is what breaks.
+              MATRIX="[$none,$mini]"
+              PUSH=false
+              VERSION="pr-${{ github.event.number }}"
+              ;;
+            workflow_dispatch)
+              if [[ "$SELECTED" == "all" ]]; then
+                MATRIX="[$none,$mini,$default,$most]"
+              else
+                case "$SELECTED" in
+                  .none.config.yml)   MATRIX="[$none]" ;;
+                  .mini.config.yml)   MATRIX="[$mini]" ;;
+                  default.config.yml) MATRIX="[$default]" ;;
+                  .most.config.yml)   MATRIX="[$most]" ;;
+                  *) echo "::error::unknown config '$SELECTED'"; exit 1 ;;
+                esac
+              fi
+              PUSH=true
+              VERSION="${{ github.event.inputs.version }}"
+              ;;
+            *)
+              # tag push and the weekly schedule both build everything
+              MATRIX="[$none,$mini,$default,$most]"
+              TAG="${{ github.ref_name }}"
+              if [[ "$EVENT" == "push" ]]; then
+                PUSH=true; VERSION="${TAG#v}"
+              else
+                PUSH=false; VERSION="nightly"
+              fi
+              ;;
+          esac
 
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          git add "Formula/$FORMULA.rb"
-          git commit -m "Homebrew: $FORMULA: $TAG"
-          git push
-        env:
-          FORMULA: env-setup
-          REPO: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
-        working-directory: ./homebrew-tap
+          echo "matrix={\"include\":$MATRIX}" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION"             >> "$GITHUB_OUTPUT"
+          echo "push=$PUSH"                   >> "$GITHUB_OUTPUT"
+          echo "base_hash=$BASE_HASH"         >> "$GITHUB_OUTPUT"
+          echo "base_image=$BASE_IMAGE"       >> "$GITHUB_OUTPUT"
+          echo "repo=$REPO_LOWER"             >> "$GITHUB_OUTPUT"
+          echo "Planned: $MATRIX (push=$PUSH version=$VERSION base_image=$BASE_IMAGE)"
 
-  build-and-deploy-image:
-    if: github.event_name == 'workflow_dispatch'
+  base:
+    needs: [setup]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
+      contents: read
       packages: write
     steps:
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # ratchet:actions/checkout@v4
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # ratchet:docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check base image existence
+        id: check-base
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_IMAGE="${{ needs.setup.outputs.base_image }}"
+          echo "Checking manifest for $BASE_IMAGE..."
+          if docker manifest inspect "$BASE_IMAGE" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Base image $BASE_IMAGE already exists."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Base image $BASE_IMAGE not found; will build."
+          fi
+
+      - name: Set up Docker Buildx
+        if: steps.check-base.outputs.exists != 'true'
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # ratchet:docker/setup-buildx-action@v3
+
+      - name: Build and push warm base
+        if: steps.check-base.outputs.exists != 'true'
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # ratchet:docker/build-push-action@v6
+        with:
+          file: infra/docker/Dockerfile.base
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ needs.setup.outputs.base_image }}
+            ${{ needs.setup.outputs.push == 'true' && format('{0}:base-latest', needs.setup.outputs.repo) || '' }}
+          cache-from: |
+            type=registry,ref=${{ needs.setup.outputs.repo }}:buildcache-base
+            type=gha
+          cache-to: ${{ format('type=registry,ref={0}:buildcache-base,mode=max', needs.setup.outputs.repo) }}
+
+  image:
+    needs: [setup, base]
+    runs-on: ubuntu-latest
+    # Per-job cap. Previously unset, so a stuck build burned the full 6h
+    # job limit before anyone noticed.
+    timeout-minutes: ${{ matrix.timeout }}
+    strategy:
+      # One bad config must not mask the state of the other three.
+      fail-fast: false
+      # Four concurrent brew-heavy builds thrash the shared layer cache.
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # ratchet:actions/checkout@v4
+
+      # NOTE: no setup-qemu-action. This builds linux/amd64 on an amd64
+      # runner, so QEMU was pure overhead.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # ratchet:docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # ratchet:docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -122,57 +234,100 @@ jobs:
           ENVSETUP_SSH_KEY: ${{ secrets.ENVSETUP_SSH_KEY }}
 
       - name: Get image tags
-        run: |
-          case "${{ env.ENVSETUP_CONFIG }}" in
-            "docker/default.config.yml") CONFIG_TAG="default";;
-            "docker/.mini.config.yml") CONFIG_TAG="mini" ;;
-            "docker/.most.config.yml") CONFIG_TAG="most" ;;
-            "docker/.none.config.yml") CONFIG_TAG="none" ;;
-            *) CONFIG_TAG="null" ;;
-          esac
-          REPO="ghcr.io/${{ github.repository }}"
-
-          echo "config_tag=$CONFIG_TAG" >> $GITHUB_OUTPUT
-          echo "repo=${REPO,,}" >> $GITHUB_OUTPUT
-          echo "repo_date=$(date --rfc-3339=date)" >> $GITHUB_OUTPUT
-          echo "repo_revision=${{ github.sha }}" >> $GITHUB_OUTPUT
-          echo "tag=${{ env.ENVSETUP_VERSION }}-$CONFIG_TAG" >> $GITHUB_OUTPUT
         id: get-tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          REPO="ghcr.io/${{ github.repository }}"
+          {
+            echo "repo=${REPO,,}"
+            echo "repo_date=$(date --rfc-3339=date)"
+            echo "repo_revision=${{ github.sha }}"
+            echo "tag=${{ needs.setup.outputs.version }}-${{ matrix.config }}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Docker meta
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051  # ratchet:docker/metadata-action@v5
         with:
           images: |
             ${{ steps.get-tags.outputs.repo }}
           tags: |
-            type=semver,pattern={{version}},value=${{ env.ENVSETUP_VERSION }},enable=${{ github.event.inputs.config == 'docker/default.config.yml' }}
+            type=semver,pattern={{version}},value=${{ needs.setup.outputs.version }},enable=${{ matrix.config == 'default' }}
             type=raw,value=${{ steps.get-tags.outputs.tag }}
-            type=raw,value=${{ steps.get-tags.outputs.config_tag }}
-            type=raw,value=latest,enable=${{ github.event.inputs.latest }}
+            type=raw,value=${{ matrix.config }}
+            type=raw,value=latest,enable=${{ matrix.config == 'default' && github.event_name == 'push' }}
         env:
           DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
 
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # ratchet:docker/build-push-action@v6
         with:
           annotations: ${{ steps.meta.outputs.annotations }}
           build-args: |
             ENVSETUP_REPO_SSH=${{ env.ENVSETUP_REPO_SSH }}
             ENVSETUP_DOTFILES_REPO_SSH=${{ env.ENVSETUP_DOTFILES_REPO_SSH }}
             ENVSETUP_DOTFILES_PRV_REPO_SSH=${{ env.ENVSETUP_DOTFILES_PRV_REPO_SSH }}
-            ENVSETUP_CONFIG=${{ env.ENVSETUP_CONFIG }}
-            ENVSETUP_VERSION=${{ env.ENVSETUP_VERSION }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          file: docker/Dockerfile
+            ENVSETUP_CONFIG=${{ matrix.file }}
+            ENVSETUP_VERSION=${{ needs.setup.outputs.version }}
+            BASE_IMAGE=${{ needs.setup.outputs.base_image }}
+          # Registry cache, not type=gha: the GHA cache is branch-scoped,
+          # evicted after 7 days, and shares a 10GB repo budget that a
+          # brew-heavy mode=max export blows through -- which is why zero
+          # buildx caches existed despite cache-to being configured.
+          # type=gha is kept as a secondary source for same-day PR iteration.
+          cache-from: |
+            type=registry,ref=${{ steps.get-tags.outputs.repo }}:buildcache-${{ matrix.config }}
+            type=gha
+          cache-to: ${{ needs.setup.outputs.push == 'true' && format('type=registry,ref={0}:buildcache-{1},mode=max', steps.get-tags.outputs.repo, matrix.config) || 'type=gha,mode=max' }}
+          file: infra/docker/Dockerfile
           labels: |
             org.opencontainers.image.created=${{ steps.get-tags.outputs.repo_date }}
             org.opencontainers.image.ref.name=${{ github.repository }}-${{ steps.get-tags.outputs.tag }}
             org.opencontainers.image.revision=${{ steps.get-tags.outputs.repo_revision }}
-            org.opencontainers.image.version=${{ env.ENVSETUP_VERSION }}
+            org.opencontainers.image.version=${{ needs.setup.outputs.version }}
           platforms: linux/amd64
-          push: true
+          push: ${{ needs.setup.outputs.push == 'true' }}
           secret-files: |
             ssh=./.ssh_key_id_rsa
           tags: ${{ steps.meta.outputs.tags }}
+
+  # Publishes the Homebrew formula. Gated on `needs: [image]` so a tag can no
+  # longer ship a formula for an image that failed to build -- which is
+  # exactly how v2.0.0 was released.
+  release:
+    needs: [setup, image]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout Homebrew tap repo
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # ratchet:actions/checkout@v4
+        with:
+          repository: luciditi/homebrew-tap
+          token: ${{ github.token }}
+          path: ./homebrew-tap
+
+      - name: Setup deploy key
+        uses: webfactory/ssh-agent@dc588b651fe13675774614f8e6a936a468676387  # ratchet:webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HOMEBREW_TAPS_SSH_KEY }}
+
+      - name: Create env-setup Brew Formula release
+        run: |
+          set -euo pipefail
+          RELEASE_URL="https://github.com/$REPO/archive/refs/tags/$TAG.tar.gz"
+          SHA256=$(openssl sha256 <(curl -sL "$RELEASE_URL") | cut -d' ' -f2)
+          export RELEASE_URL SHA256
+          envsubst '$RELEASE_URL,$SHA256' < "Formula/.templates/.$FORMULA.tpl" > "Formula/$FORMULA.rb"
+
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add "Formula/$FORMULA.rb"
+          git commit -m "Homebrew: $FORMULA: $TAG"
+          git push
+        env:
+          FORMULA: env-setup
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        working-directory: ./homebrew-tap
