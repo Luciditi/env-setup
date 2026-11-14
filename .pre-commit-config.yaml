@@ -5,7 +5,7 @@ repos:
     hooks:
       - id: shellcheck
         args: ["-x"]
-        files: "^(scripts/|infra/terraform/scripts/)"
+        files: "^(scripts/|infra/android/|infra/terraform/scripts/)"
         types_or: [shell, bash, text]
         exclude: "^.*\\.(md|yml|yaml|json|toml|xml|txt|ini)$"
 
@@ -29,4 +29,4 @@ repos:
         entry: bats tests
         language: system
         pass_filenames: false
-        files: "^(scripts/|tests/)"
+        files: "^(scripts/|infra/android/|tests/)"
