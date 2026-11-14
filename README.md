@@ -120,23 +120,9 @@ You can override these environment variables to change behavior.
 - `ANSIBLE_TAGS`: `env-setup` runs Ansible and runs specific tags. The value is a comma-delimited list of tags.
 - `ANSIBLE_VERBOSE`: `env-setup` runs Ansible with verbosity. A value of `-vvv` enables verbosity.
 
-## Testing
+## Testing/Infrastructure
 
 `env-setup` has tools to install an environment for testing.
-
-### Docker
-
-The `infra/docker` [directory](infra/docker) contains `Dockerfile` and `Dockerfile.base`. The `Dockerfile.base` builds an accelerated warm base image with common formula dependencies pre-installed to optimize CI and local builds.
-
-You can find pre-built images on [ghcr.io/luciditi/env-setup](https://github.com/Luciditi/env-setup/tree/main/infra/docker#hosted-images). 
-
-To test with a quick command, run `source <(curl -sL jig.io/dev-aliases) && dev-env`. This command installs an alias for `docker run ... ghcr.io/luciditi/env-setup`.
-
-### Terraform
-
-The `terraform` [directory](infra/terraform) is a Terraform module. The module builds an SSH key and EC2 VMs for Linux (Ubuntu 24.04) and macOS (Sonoma). 
-
-After you build the VMs, use the [scripts](infra/terraform/scripts) to test `env-setup` in the new VMs.
 
 ### VMs in Tart
 
@@ -151,6 +137,14 @@ Tart VM management and end-to-end testing is built directly into the CLI via `en
 7. Run `env-setup vm stop <name>` to halt the VM.
 
 *(For shell aliases, `eval "$(env-setup -A)"` provides shortcut commands).*
+
+### Android Linux Terminal (`images.tar.gz`)
+
+The `infra/android` [directory](infra/android) builds a custom Debian `aarch64` image archive (`images.tar.gz`) for Android's built-in **Linux Terminal** app (powered by the Android Virtualization Framework) and supports booting the image locally in Tart on Apple Silicon:
+
+1. Run `env-setup vm android build --config default --import` to build `images.tar.gz` inside your Tart Linux VM and import it as a local `debian-android` Tart VM.
+2. Run `env-setup vm start debian-android && env-setup vm ssh debian-android` to test the Android Debian image locally on macOS.
+3. Run `env-setup vm android push images.tar.gz` to push the built archive to `/sdcard/linux/images.tar.gz` on a connected Android device via `adb`.
 
 ## Custom Playbook
 
