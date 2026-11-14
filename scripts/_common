@@ -78,6 +78,7 @@ ENVSETUP_REMOTE_DIR=${ENVSETUP_REMOTE_DIR:-"\$HOME/env-setup"}
 
 TART_MACOS_NAME=${TART_MACOS_NAME:-"tahoe-base"}
 TART_LINUX_NAME=${TART_LINUX_NAME:-"ubuntu"}
+TART_ANDROID_NAME=${TART_ANDROID_NAME:-"debian-android"}
 # https://github.com/orgs/cirruslabs/packages?repo_name=macos-image-templates
 TART_MACOS_IMAGE="ghcr.io/cirruslabs/macos-$TART_MACOS_NAME:latest"
 # https://github.com/orgs/cirruslabs/packages?repo_name=linux-image-templates
