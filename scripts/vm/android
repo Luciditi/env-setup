@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPTS_DIR="$(dirname "${BASH_SOURCE[0]}")"
+# shellcheck source=scripts/_common
+source "$SCRIPTS_DIR/../_common"
+# shellcheck source=scripts/_vm
+source "$SCRIPTS_DIR/../_vm"
+# shellcheck source=scripts/_remote
+source "$SCRIPTS_DIR/../_remote"
+
+usage() {
+    cat << EOF
+Usage: env-setup vm android <subcommand> [options]
+
+Subcommands:
+  build [--config <preset>] [--output <path>] [--import]
+      Build Android AVF images.tar.gz inside the running Tart Linux VM
+      (and optionally stitch & import as a local '${TART_ANDROID_NAME}' Tart VM).
+  import <disk.img> [vm-name]
+      Import a stitched GPT disk.img into Tart as a bootable ARM64 Linux VM.
+  push [images.tar.gz]
+      Push images.tar.gz to a connected Android device (/sdcard/linux/images.tar.gz).
+EOF
+}
+
+import_tart_vm() {
+    local disk_src="$1"
+    local vm_name="${2:-$TART_ANDROID_NAME}"
+    local tart_root="${TART_HOME:-$HOME/.tart}"
+    local vm_dir="$tart_root/vms/$vm_name"
+
+    if [[ ! -f "$disk_src" ]]; then
+        echo -e "${C_ERR}Disk image not found: ${disk_src}${C_RES}" >&2
+        exit 1
+    fi
+
+    mkdir -p "$vm_dir"
+    cp -f "$disk_src" "$vm_dir/disk.img"
+    cat > "$vm_dir/config.json" << 'EOF'
+{
+  "version": 1,
+  "os": "linux",
+  "arch": "arm64",
+  "cpuCount": 4,
+  "memorySize": 4294967296,
+  "display": {
+    "width": 1024,
+    "height": 768
+  }
+}
+EOF
+    echo -e "${C_SUC}Imported Tart VM '${vm_name}' at ${vm_dir}.${C_RES}"
+    echo -e "Run ${C_WAR}env-setup vm start ${vm_name}${C_RES} and ${C_WAR}env-setup vm ssh ${vm_name}${C_RES} to test it locally."
+}
+
+SUBCMD="${1:-}"
+if [[ -z "$SUBCMD" || "$SUBCMD" == "-h" || "$SUBCMD" == "--help" ]]; then
+    usage
+    exit 0
+fi
+shift
+
+case "$SUBCMD" in
+    import)
+        DISK_IMG="${1:-}"
+        VM_NAME="${2:-$TART_ANDROID_NAME}"
+        if [[ -z "$DISK_IMG" ]]; then
+            echo -e "${C_ERR}Usage: env-setup vm android import <disk.img> [vm-name]${C_RES}" >&2
+            exit 1
+        fi
+        import_tart_vm "$DISK_IMG" "$VM_NAME"
+        ;;
+    push)
+        exec "$INSTALL_DIR/infra/android/push-image.sh" "$@"
+        ;;
+    build)
+        CONFIG_PRESET="default"
+        OUTPUT_PATH="$PWD/images.tar.gz"
+        DO_IMPORT="0"
+        BUILDER_VM="$TART_LINUX_NAME"
+
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                -c|--config)
+                    CONFIG_PRESET="${2:-}"
+                    shift 2
+                    ;;
+                -o|--output)
+                    OUTPUT_PATH="${2:-}"
+                    shift 2
+                    ;;
+                --import)
+                    DO_IMPORT="1"
+                    shift
+                    ;;
+                --vm)
+                    BUILDER_VM="${2:-}"
+                    shift 2
+                    ;;
+                -h|--help)
+                    usage
+                    exit 0
+                    ;;
+                *)
+                    echo -e "${C_ERR}Unknown option: $1${C_RES}" >&2
+                    usage >&2
+                    exit 1
+                    ;;
+            esac
+        done
+
+        if ! vm_running "$BUILDER_VM"; then
+            echo -e "${C_ERR}Tart Linux builder VM '${BUILDER_VM}' is not running!${C_RES}" >&2
+            echo -e "Start it first with: ${C_WAR}env-setup vm start ${BUILDER_VM}${C_RES}" >&2
+            exit 1
+        fi
+
+        SSH_HOST="$(vm_ip "$BUILDER_VM")"
+        echo -e "\n${C_HIL}Syncing env-setup to Tart builder VM ${BUILDER_VM} (${SSH_HOST})...${C_RES}"
+        remote_exec "$SSH_HOST" "mkdir -p ~/env-setup"
+        remote_copy "$INSTALL_DIR/" "$SSH_HOST" "env-setup/"
+
+        REMOTE_ARGS="--config ${CONFIG_PRESET} --output /tmp/android-images.tar.gz"
+        if [[ "$DO_IMPORT" == "1" ]]; then
+            REMOTE_ARGS="$REMOTE_ARGS --tart-disk /tmp/android-disk.img"
+        fi
+
+        echo -e "\n${C_HIL}Building Android AVF Debian image inside ${BUILDER_VM}...${C_RES}"
+        remote_exec "$SSH_HOST" "sudo ~/env-setup/infra/android/build-image.sh $REMOTE_ARGS && sudo chown $TART_SSH_USER /tmp/android-images.tar.gz /tmp/android-disk.img 2>/dev/null || true"
+
+        echo -e "\n${C_HIL}Copying built images.tar.gz to ${OUTPUT_PATH}...${C_RES}"
+        remote_require_sshpass
+        # shellcheck disable=SC2086
+        sshpass -p "$TART_SSH_PASS" scp $TART_SSH_OPTS "$TART_SSH_USER@$SSH_HOST:/tmp/android-images.tar.gz" "$OUTPUT_PATH"
+        echo -e "${C_SUC}Saved Android image archive to ${OUTPUT_PATH}${C_RES}"
+
+        if [[ "$DO_IMPORT" == "1" ]]; then
+            TEMP_DISK="${OUTPUT_PATH%.tar.gz}-disk.img"
+            echo -e "\n${C_HIL}Copying Tart disk image to ${TEMP_DISK}...${C_RES}"
+            # shellcheck disable=SC2086
+            sshpass -p "$TART_SSH_PASS" scp $TART_SSH_OPTS "$TART_SSH_USER@$SSH_HOST:/tmp/android-disk.img" "$TEMP_DISK"
+            import_tart_vm "$TEMP_DISK" "$TART_ANDROID_NAME"
+        fi
+        ;;
+    *)
+        echo -e "${C_ERR}Unknown android subcommand: ${SUBCMD}${C_RES}" >&2
+        usage >&2
+        exit 1
+        ;;
+esac

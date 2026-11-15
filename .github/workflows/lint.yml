@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
       - 'scripts/**'
+      - 'infra/android/**'
       - 'infra/terraform/scripts/**'
       - 'ansible/**'
       - '*.yml'

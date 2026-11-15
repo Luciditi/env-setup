@@ -21,10 +21,21 @@ echo -e "${C_HIL}Installing Ansible...${C_RES}"
 if [ -x "$(command -v apk)" ]; then
     sudo apk add ansible
 elif [ -x "$(command -v apt-get)" ]; then
-    sudo apt update --yes
-    sudo apt install --yes software-properties-common
-    sudo add-apt-repository --yes --update ppa:ansible/ansible
-    sudo apt install --yes ansible
+    OS_RELEASE_FILE="${OS_RELEASE_FILE:-/etc/os-release}"
+    DISTRO_ID=""
+    if [[ -f "$OS_RELEASE_FILE" ]]; then
+        # shellcheck disable=SC1090
+        DISTRO_ID=$(. "$OS_RELEASE_FILE" && printf '%s' "${ID:-}")
+    fi
+    if [[ "$DISTRO_ID" == "ubuntu" ]]; then
+        sudo apt update --yes
+        sudo apt install --yes software-properties-common
+        sudo add-apt-repository --yes --update ppa:ansible/ansible
+        sudo apt install --yes ansible
+    else
+        sudo apt-get update --yes
+        sudo apt-get install --yes ansible python3-apt
+    fi
 elif [ -x "$(command -v dnf)" ]; then
     sudo dnf install -y ansible
 elif [ -x "$(command -v zypper)" ]; then

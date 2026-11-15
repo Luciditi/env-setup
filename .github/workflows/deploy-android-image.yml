@@ -1,0 +1,177 @@
+---
+name: deploy-android-image
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*.[0-9]*.[0-9]*'
+  pull_request:
+    paths:
+      - 'infra/android/**'
+      - 'scripts/linux/**'
+      - '.github/workflows/deploy-android-image.yml'
+  schedule:
+    - cron: '17 7 * * 1'
+  workflow_dispatch:
+    inputs:
+      config:
+        type: choice
+        description: "The configuration manifest used for building the Android AVF image."
+        options:
+          - 'all'
+          - 'default'
+          - 'mini'
+          - 'most'
+          - 'none'
+        required: true
+        default: 'default'
+
+concurrency:
+  group: deploy-android-image-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      base_hash: ${{ steps.plan.outputs.base_hash }}
+      release: ${{ steps.plan.outputs.release }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # ratchet:actions/checkout@v4
+
+      - name: Plan Android image builds
+        id: plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          EVENT="${{ github.event_name }}"
+          SELECTED="${{ github.event.inputs.config || 'default' }}"
+          BASE_HASH="${{ hashFiles('scripts/formula-intersection', '.mini.config.yml', 'default.config.yml', '.most.config.yml') }}"
+
+          none='{"config":"none","timeout":20}'
+          mini='{"config":"mini","timeout":35}'
+          default='{"config":"default","timeout":45}'
+          most='{"config":"most","timeout":60}'
+
+          RELEASE="false"
+          case "$EVENT" in
+            pull_request)
+              MATRIX="[$none,$mini]"
+              ;;
+            workflow_dispatch)
+              case "$SELECTED" in
+                all)     MATRIX="[$none,$mini,$default,$most]" ;;
+                none)    MATRIX="[$none]" ;;
+                mini)    MATRIX="[$mini]" ;;
+                default) MATRIX="[$default]" ;;
+                most)    MATRIX="[$most]" ;;
+                *) echo "::error::unknown config '$SELECTED'"; exit 1 ;;
+              esac
+              ;;
+            push)
+              MATRIX="[$mini,$default]"
+              RELEASE="true"
+              ;;
+            *)
+              MATRIX="[$mini,$default]"
+              ;;
+          esac
+
+          echo "matrix={\"include\":$MATRIX}" >> "$GITHUB_OUTPUT"
+          echo "base_hash=$BASE_HASH"         >> "$GITHUB_OUTPUT"
+          echo "release=$RELEASE"             >> "$GITHUB_OUTPUT"
+
+  base:
+    needs: [setup]
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 40
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # ratchet:actions/checkout@v4
+
+      - name: Cache warmed base root_part
+        id: cache-base
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684  # ratchet:actions/cache@v4
+        with:
+          path: /tmp/android-base/root_part
+          key: android-avf-base-arm64-${{ needs.setup.outputs.base_hash }}
+          restore-keys: |
+            android-avf-base-arm64-
+
+      - name: Build warmed base root_part
+        if: steps.cache-base.outputs.cache-hit != 'true'
+        run: |
+          if [[ ! -f /tmp/android-base/root_part ]]; then
+            sudo ./infra/android/build-image.sh \
+              --base-cache /tmp/android-base/root_part \
+              --base-only
+          fi
+
+  image:
+    needs: [setup, base]
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: ${{ matrix.timeout }}
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # ratchet:actions/checkout@v4
+
+      - name: Restore warmed base root_part
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684  # ratchet:actions/cache@v4
+        with:
+          path: /tmp/android-base/root_part
+          key: android-avf-base-arm64-${{ needs.setup.outputs.base_hash }}
+          restore-keys: |
+            android-avf-base-arm64-
+
+      - name: Setup SSH key
+        env:
+          ENVSETUP_SSH_KEY: ${{ secrets.ENVSETUP_SSH_KEY }}
+        run: |
+          if [[ -n "${ENVSETUP_SSH_KEY:-}" ]]; then
+            printf '%s\n' "$ENVSETUP_SSH_KEY" > ./.ssh_key_id_rsa
+            chmod 600 ./.ssh_key_id_rsa
+          fi
+
+      - name: Build Android AVF images.tar.gz (${{ matrix.config }})
+        run: |
+          sudo ENVSETUP_SSH_KEY_FILE="$PWD/.ssh_key_id_rsa" ./infra/android/build-image.sh \
+            --config "${{ matrix.config }}" \
+            --base-cache /tmp/android-base/root_part \
+            --output "android-${{ matrix.config }}-images.tar.gz"
+          rm -f ./.ssh_key_id_rsa
+          sudo chown "$USER" "android-${{ matrix.config }}-images.tar.gz"
+
+      - name: Upload Android AVF image artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # ratchet:actions/upload-artifact@v4
+        with:
+          name: android-${{ matrix.config }}-images.tar.gz
+          path: android-${{ matrix.config }}-images.tar.gz
+          if-no-files-found: error
+
+      - name: Attach archive to GitHub Release
+        if: needs.setup.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ github.ref_name }}"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --generate-notes
+          fi
+          gh release upload "$TAG" "android-${{ matrix.config }}-images.tar.gz" --clobber
+          if [[ "${{ matrix.config }}" == "default" ]]; then
+            cp -f "android-default-images.tar.gz" "images.tar.gz"
+            gh release upload "$TAG" "images.tar.gz" --clobber
+          fi

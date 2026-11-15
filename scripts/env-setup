@@ -286,6 +286,7 @@ Subcommands:
   init [vm-name] <url>         Run bootstrap init script inside a Tart VM
   warm [vm-name]               Pre-install common packages and galaxy reqs in VM
   test [macos|linux] [target]  Run ephemeral E2E tests with idempotency assertion
+  android <build|import|push>  Build, import to Tart, or adb-push Android Debian image
 EOF
 }
 
