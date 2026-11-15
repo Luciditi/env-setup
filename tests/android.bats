@@ -86,3 +86,16 @@ load test_helper
     [[ "$output" =~ "--config mini" ]]
 }
 
+@test "build-image.sh: mount_chroot mounts /dev/shm with 1777 permissions for Ansible multiprocessing" {
+    run grep -E "mount.*dev/shm" "$REPO_ROOT/infra/android/build-image.sh"
+    [ "$status" -eq 0 ]
+    run grep -E "chmod 1777.*shm" "$REPO_ROOT/infra/android/build-image.sh"
+    [ "$status" -eq 0 ]
+}
+
+@test "build-image.sh: configures git HTTPS fallback when SSH key is absent" {
+    run grep -E 'insteadOf.*git@github.com:' "$REPO_ROOT/infra/android/build-image.sh"
+    [ "$status" -eq 0 ]
+}
+
+

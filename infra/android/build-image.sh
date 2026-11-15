@@ -133,6 +133,7 @@ mkdir -p "$MOUNT_DIR"
 
 cleanup_mounts() {
     set +e
+    if mountpoint -q "$MOUNT_DIR/dev/shm" 2>/dev/null; then umount -lf "$MOUNT_DIR/dev/shm"; fi
     if mountpoint -q "$MOUNT_DIR/dev/pts" 2>/dev/null; then umount -lf "$MOUNT_DIR/dev/pts"; fi
     if mountpoint -q "$MOUNT_DIR/dev" 2>/dev/null; then umount -lf "$MOUNT_DIR/dev"; fi
     if mountpoint -q "$MOUNT_DIR/sys" 2>/dev/null; then umount -lf "$MOUNT_DIR/sys"; fi
@@ -153,6 +154,9 @@ mount_chroot() {
     mount -t sysfs /sys "$MOUNT_DIR/sys"
     mount --bind /dev "$MOUNT_DIR/dev"
     mount --bind /dev/pts "$MOUNT_DIR/dev/pts"
+    mkdir -p "$MOUNT_DIR/dev/shm" "$MOUNT_DIR/run/shm"
+    mount -t tmpfs -o mode=1777 tmpfs "$MOUNT_DIR/dev/shm"
+    chmod 1777 "$MOUNT_DIR/dev/shm" "$MOUNT_DIR/run/shm"
     if [[ -L "$MOUNT_DIR/etc/resolv.conf" || -f "$MOUNT_DIR/etc/resolv.conf" ]]; then
         mv -f "$MOUNT_DIR/etc/resolv.conf" "$MOUNT_DIR/etc/resolv.conf.bak"
     fi
@@ -164,6 +168,7 @@ unmount_chroot() {
         mv -f "$MOUNT_DIR/etc/resolv.conf.bak" "$MOUNT_DIR/etc/resolv.conf"
     fi
     sync
+    umount "$MOUNT_DIR/dev/shm"
     umount "$MOUNT_DIR/dev/pts"
     umount "$MOUNT_DIR/dev"
     umount "$MOUNT_DIR/sys"
@@ -180,7 +185,7 @@ else
     e2fsck -f -y "$WORK_DIR/root_part" || true
     resize2fs "$WORK_DIR/root_part"
 
-    WARM_FORMULAE="$("$REPO_DIR/scripts/formula-intersection" --format=space)"
+    WARM_FORMULAE="gcc docker $("$REPO_DIR/scripts/formula-intersection" --format=space)"
     mount_chroot
 
     chroot "$MOUNT_DIR" /bin/bash -c "
@@ -247,7 +252,6 @@ NETEOF
             brew install ${WARM_FORMULAE} || true
         '
         apt-get clean
-        rm -rf /var/lib/apt/lists/*
     "
 
     unmount_chroot
@@ -271,7 +275,7 @@ rm -rf "$MOUNT_DIR/home/droid/env-setup"
 cp -rf "$REPO_DIR" "$MOUNT_DIR/home/droid/env-setup"
 cp -f "$REPO_DIR/$CONFIG_FILE" "$MOUNT_DIR/home/droid/env-setup/config.yml"
 
-if [[ -n "${ENVSETUP_SSH_KEY_FILE:-}" && -f "$ENVSETUP_SSH_KEY_FILE" ]]; then
+if [[ -n "${ENVSETUP_SSH_KEY_FILE:-}" && -s "$ENVSETUP_SSH_KEY_FILE" ]]; then
     cp -f "$ENVSETUP_SSH_KEY_FILE" "$MOUNT_DIR/home/droid/.ssh/id_rsa"
     chmod 400 "$MOUNT_DIR/home/droid/.ssh/id_rsa"
 fi
@@ -287,6 +291,9 @@ chroot "$MOUNT_DIR" /bin/bash -c "
         for rc in .bashrc .zshrc .profile .zprofile; do
             echo \"alias env-setup=\\\"/home/droid/env-setup/scripts/env-setup\\\"\" >> \"/home/droid/\$rc\"
         done
+        if [[ ! -s /home/droid/.ssh/id_rsa ]]; then
+            git config --global url.\"https://github.com/\".insteadOf \"git@github.com:\"
+        fi
         if [[ ! -d /home/droid/env-setup-dotfiles ]]; then
             git clone https://github.com/Luciditi/env-setup-dotfiles.git /home/droid/env-setup-dotfiles || true
         fi
@@ -299,6 +306,7 @@ chroot "$MOUNT_DIR" /bin/bash -c "
         /home/droid/env-setup/scripts/env-setup 05-repos
         /home/droid/env-setup/scripts/env-setup 07-cloud
         /home/droid/env-setup/scripts/env-setup 08-prefs
+        git config --global --unset-all url.\"https://github.com/\".insteadOf || true
     '
     rm -f /home/droid/.ssh/id_rsa
     apt-get clean

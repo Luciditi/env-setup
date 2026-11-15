@@ -129,12 +129,22 @@ jobs:
           path: /tmp/android-base/root_part
           key: android-avf-base-arm64-${{ needs.setup.outputs.base_hash }}
 
+      - name: Setup SSH key
+        env:
+          ENVSETUP_SSH_KEY: ${{ secrets.ENVSETUP_SSH_KEY }}
+        run: |
+          if [[ -n "${ENVSETUP_SSH_KEY:-}" ]]; then
+            printf '%s\n' "$ENVSETUP_SSH_KEY" > ./.ssh_key_id_rsa
+            chmod 600 ./.ssh_key_id_rsa
+          fi
+
       - name: Build Android AVF images.tar.gz (${{ matrix.config }})
         run: |
-          sudo ./infra/android/build-image.sh \
+          sudo ENVSETUP_SSH_KEY_FILE="$PWD/.ssh_key_id_rsa" ./infra/android/build-image.sh \
             --config "${{ matrix.config }}" \
             --base-cache /tmp/android-base/root_part \
             --output "android-${{ matrix.config }}-images.tar.gz"
+          rm -f ./.ssh_key_id_rsa
           sudo chown "$USER" "android-${{ matrix.config }}-images.tar.gz"
 
       - name: Upload Android AVF image artifact
