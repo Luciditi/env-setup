@@ -52,7 +52,7 @@ jobs:
           set -euo pipefail
           EVENT="${{ github.event_name }}"
           SELECTED="${{ github.event.inputs.config || 'default' }}"
-          BASE_HASH="${{ hashFiles('infra/android/build-image.sh', 'scripts/formula-intersection', '.mini.config.yml', 'default.config.yml', '.most.config.yml') }}"
+          BASE_HASH="${{ hashFiles('scripts/formula-intersection', '.mini.config.yml', 'default.config.yml', '.most.config.yml') }}"
 
           none='{"config":"none","timeout":20}'
           mini='{"config":"mini","timeout":35}'
@@ -101,13 +101,17 @@ jobs:
         with:
           path: /tmp/android-base/root_part
           key: android-avf-base-arm64-${{ needs.setup.outputs.base_hash }}
+          restore-keys: |
+            android-avf-base-arm64-
 
       - name: Build warmed base root_part
         if: steps.cache-base.outputs.cache-hit != 'true'
         run: |
-          sudo ./infra/android/build-image.sh \
-            --base-cache /tmp/android-base/root_part \
-            --base-only
+          if [[ ! -f /tmp/android-base/root_part ]]; then
+            sudo ./infra/android/build-image.sh \
+              --base-cache /tmp/android-base/root_part \
+              --base-only
+          fi
 
   image:
     needs: [setup, base]
@@ -128,6 +132,8 @@ jobs:
         with:
           path: /tmp/android-base/root_part
           key: android-avf-base-arm64-${{ needs.setup.outputs.base_hash }}
+          restore-keys: |
+            android-avf-base-arm64-
 
       - name: Setup SSH key
         env:

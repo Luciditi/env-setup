@@ -55,6 +55,30 @@ resolve_config_file() {
     esac
 }
 
+package_android_archive() {
+    local archive_dir="$1"
+    local output_path="$2"
+    local output_abs
+    output_abs="$(abspath "$output_path")"
+    mkdir -p "$(dirname "$output_abs")"
+    (
+        cd "$archive_dir"
+        if tar --version 2>/dev/null | grep -q "GNU tar"; then
+            if command -v pigz >/dev/null 2>&1; then
+                tar --use-compress-program=pigz -cSf "$output_abs" -- *
+            else
+                tar -czSf "$output_abs" -- *
+            fi
+        else
+            tar -czf "$output_abs" -- *
+        fi
+    )
+}
+
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    return 0
+fi
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -c|--config)
@@ -128,8 +152,9 @@ if [[ "$(id -u)" -ne 0 ]]; then
 fi
 
 WORK_DIR="$(mktemp -d -t envsetup-android-XXXXXX)"
+ARCHIVE_DIR="$WORK_DIR/archive"
 MOUNT_DIR="$WORK_DIR/mnt"
-mkdir -p "$MOUNT_DIR"
+mkdir -p "$ARCHIVE_DIR" "$MOUNT_DIR"
 
 cleanup_mounts() {
     set +e
@@ -145,11 +170,15 @@ trap cleanup_mounts EXIT
 
 echo -e "\n${C_HIL}1. Fetching upstream AVF Debian archive...${C_RES}"
 curl -fL --retry 3 -o "$WORK_DIR/upstream-images.tar.gz" "$SOURCE_URL"
-tar -xzf "$WORK_DIR/upstream-images.tar.gz" -C "$WORK_DIR"
+if [[ -n "$BASE_CACHE" && -f "$BASE_CACHE" && "$BASE_ONLY" == "0" ]]; then
+    tar -xzf "$WORK_DIR/upstream-images.tar.gz" -C "$ARCHIVE_DIR" --exclude=root_part
+else
+    tar -xzf "$WORK_DIR/upstream-images.tar.gz" -C "$ARCHIVE_DIR"
+fi
 rm -f "$WORK_DIR/upstream-images.tar.gz"
 
 mount_chroot() {
-    mount -o loop "$WORK_DIR/root_part" "$MOUNT_DIR"
+    mount -o loop "$ARCHIVE_DIR/root_part" "$MOUNT_DIR"
     mount -t proc /proc "$MOUNT_DIR/proc"
     mount -t sysfs /sys "$MOUNT_DIR/sys"
     mount --bind /dev "$MOUNT_DIR/dev"
@@ -178,12 +207,12 @@ unmount_chroot() {
 
 if [[ -n "$BASE_CACHE" && -f "$BASE_CACHE" && "$BASE_ONLY" == "0" ]]; then
     echo -e "\n${C_HIL}2. Restoring warmed base root_part from ${BASE_CACHE}...${C_RES}"
-    cp -f "$BASE_CACHE" "$WORK_DIR/root_part"
+    cp -f --sparse=always "$BASE_CACHE" "$ARCHIVE_DIR/root_part"
 else
     echo -e "\n${C_HIL}2. Expanding root_part (+${GROW_SIZE_GB}G) and warming base packages...${C_RES}"
-    truncate -s "+${GROW_SIZE_GB}G" "$WORK_DIR/root_part"
-    e2fsck -f -y "$WORK_DIR/root_part" || true
-    resize2fs "$WORK_DIR/root_part"
+    truncate -s "+${GROW_SIZE_GB}G" "$ARCHIVE_DIR/root_part"
+    e2fsck -f -y "$ARCHIVE_DIR/root_part" || true
+    resize2fs "$ARCHIVE_DIR/root_part"
 
     WARM_FORMULAE="gcc docker $("$REPO_DIR/scripts/formula-intersection" --format=space)"
     mount_chroot
@@ -259,7 +288,7 @@ NETEOF
     if [[ -n "$BASE_CACHE" ]]; then
         echo -e "\n${C_HIL}Saving warmed base root_part to ${BASE_CACHE}...${C_RES}"
         mkdir -p "$(dirname "$BASE_CACHE")"
-        cp -f --sparse=always "$WORK_DIR/root_part" "$BASE_CACHE"
+        cp -f --sparse=always "$ARCHIVE_DIR/root_part" "$BASE_CACHE"
     fi
 
     if [[ "$BASE_ONLY" == "1" ]]; then
@@ -316,24 +345,31 @@ chroot "$MOUNT_DIR" /bin/bash -c "
 unmount_chroot
 
 echo -e "\n${C_HIL}4. Shrinking ext4 root_part and packaging sparse images.tar.gz...${C_RES}"
-e2fsck -f -y "$WORK_DIR/root_part" || true
-resize2fs -M "$WORK_DIR/root_part"
+e2fsck -f -y "$ARCHIVE_DIR/root_part" || true
+resize2fs -M "$ARCHIVE_DIR/root_part"
 
 # Add 512MB free headroom so the booted VM has immediate writable space before ballooning
-BLOCK_COUNT=$(dumpe2fs -h "$WORK_DIR/root_part" 2>/dev/null | awk -F: '/Block count:/ {gsub(/ /, "", $2); print $2}')
-BLOCK_SIZE=$(dumpe2fs -h "$WORK_DIR/root_part" 2>/dev/null | awk -F: '/Block size:/ {gsub(/ /, "", $2); print $2}')
+BLOCK_COUNT=$(dumpe2fs -h "$ARCHIVE_DIR/root_part" 2>/dev/null | awk -F: '/Block count:/ {gsub(/ /, "", $2); print $2}')
+BLOCK_SIZE=$(dumpe2fs -h "$ARCHIVE_DIR/root_part" 2>/dev/null | awk -F: '/Block size:/ {gsub(/ /, "", $2); print $2}')
 FINAL_BYTES=$(( BLOCK_COUNT * BLOCK_SIZE + 536870912 ))
-truncate -s "$FINAL_BYTES" "$WORK_DIR/root_part"
-resize2fs "$WORK_DIR/root_part"
+truncate -s "$FINAL_BYTES" "$ARCHIVE_DIR/root_part"
+resize2fs "$ARCHIVE_DIR/root_part"
 
-mkdir -p "$(dirname "$(abspath "$OUTPUT_PATH")")"
-tar -C "$WORK_DIR" -czSf "$(abspath "$OUTPUT_PATH")" build_id efi_part root_part vm_config.json
+package_android_archive "$ARCHIVE_DIR" "$OUTPUT_PATH"
 echo -e "${C_SUC}Created Android AVF archive: ${OUTPUT_PATH}${C_RES}"
 
 if [[ -n "$TART_DISK" ]]; then
     echo -e "\n${C_HIL}5. Stitching GPT disk image for Tart VM (${TART_DISK})...${C_RES}"
-    EFI_SIZE=$(stat -c '%s' "$WORK_DIR/efi_part")
-    ROOT_SIZE=$(stat -c '%s' "$WORK_DIR/root_part")
+    EFI_IMG="$ARCHIVE_DIR/efi_part"
+    if [[ ! -f "$EFI_IMG" ]]; then
+        EFI_IMG="$WORK_DIR/efi_part"
+        truncate -s 64M "$EFI_IMG"
+        if command -v mkfs.vfat >/dev/null 2>&1; then
+            mkfs.vfat -F 32 "$EFI_IMG" >/dev/null
+        fi
+    fi
+    EFI_SIZE=$(stat -c '%s' "$EFI_IMG")
+    ROOT_SIZE=$(stat -c '%s' "$ARCHIVE_DIR/root_part")
     # 2MB alignment padding at start and end for GPT headers
     TOTAL_DISK_BYTES=$(( EFI_SIZE + ROOT_SIZE + 4194304 ))
     EFI_SECTORS=$(( EFI_SIZE / 512 ))
@@ -349,7 +385,7 @@ unit: sectors
 2 : start=${ROOT_START_SECTOR}, type=B921B045-1DF0-41C3-AF44-4C6F280D3FAE, name="ROOT"
 SFDISK_EOF
 
-    dd if="$WORK_DIR/efi_part" of="$TART_DISK" bs=512 seek=2048 conv=notrunc,sparse status=none
-    dd if="$WORK_DIR/root_part" of="$TART_DISK" bs=512 seek="$ROOT_START_SECTOR" conv=notrunc,sparse status=none
+    dd if="$EFI_IMG" of="$TART_DISK" bs=512 seek=2048 conv=notrunc,sparse status=none
+    dd if="$ARCHIVE_DIR/root_part" of="$TART_DISK" bs=512 seek="$ROOT_START_SECTOR" conv=notrunc,sparse status=none
     echo -e "${C_SUC}Created Tart GPT disk image: ${TART_DISK}${C_RES}"
 fi

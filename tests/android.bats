@@ -98,4 +98,25 @@ load test_helper
     [ "$status" -eq 0 ]
 }
 
+@test "build-image.sh: package_android_archive packages vmlinuz/initrd.img/cidata.iso without requiring efi_part" {
+    mkdir -p "$TEST_TMP/archive"
+    for f in build_id root_part vm_config.json vmlinuz initrd.img cidata.iso; do
+        printf '%s\n' "$f" > "$TEST_TMP/archive/$f"
+    done
+
+    run bash -c "source '$REPO_ROOT/infra/android/build-image.sh' && package_android_archive '$TEST_TMP/archive' '$TEST_TMP/images.tar.gz'"
+    [ "$status" -eq 0 ]
+    [ -f "$TEST_TMP/images.tar.gz" ]
+
+    run tar -tzf "$TEST_TMP/images.tar.gz"
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "build_id" ]]
+    [[ "$output" =~ "root_part" ]]
+    [[ "$output" =~ "vm_config.json" ]]
+    [[ "$output" =~ "vmlinuz" ]]
+    [[ "$output" =~ "initrd.img" ]]
+    [[ "$output" =~ "cidata.iso" ]]
+}
+
+
 

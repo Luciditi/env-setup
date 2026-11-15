@@ -4,7 +4,7 @@
 
 ## How It Works
 
-1. Fetches Google's upstream AVF Debian `aarch64` archive (`https://dl.google.com/android/ferrochrome/latest/aarch64/images.tar.gz`), preserving the official kernel, `efi_part`, `vm_config.json`, `build_id`, and AVF guest daemons (`ttyd`, `forwarder_guest_launcher`, `storage_balloon_agent`, `shutdown_runner`).
+1. Fetches Google's upstream AVF Debian `aarch64` archive (`https://dl.google.com/android/ferrochrome/latest/aarch64/images.tar.gz`), preserving all upstream boot/config artifacts (`vmlinuz`, `initrd.img`, `cidata.iso`, `efi_part`, `vm_config.json`, `build_id`) and AVF guest daemons (`ttyd`, `forwarder_guest_launcher`, `storage_balloon_agent`, `shutdown_runner`).
 2. Expands and loop-mounts `root_part` (ext4).
 3. Installs Ansible, Linuxbrew (`/home/linuxbrew/.linuxbrew`), Ansible Galaxy requirements, and the `scripts/formula-intersection` warm packages under the default `droid` user (plus `openssh-server` and `virtio-net` DHCP fallback for Tart VM).
 4. Runs `env-setup` playbooks (`01-config`, `02-cli`, `04-packages`, `05-repos`, `07-cloud`, `08-prefs`) for the chosen config preset (`none`, `mini`, `default`, or `most`).
