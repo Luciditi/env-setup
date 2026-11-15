@@ -118,5 +118,15 @@ load test_helper
     [[ "$output" =~ "cidata.iso" ]]
 }
 
+@test "build-image.sh: purges Homebrew bottle cache and mounts /tmp as tmpfs to keep archive under 2 GiB" {
+    run grep -E "brew cleanup --prune=all" "$REPO_ROOT/infra/android/build-image.sh"
+    [ "$status" -eq 0 ]
+    run grep -E 'mount -t tmpfs.*\$MOUNT_DIR/tmp' "$REPO_ROOT/infra/android/build-image.sh"
+    [ "$status" -eq 0 ]
+    run grep -E "fstrim" "$REPO_ROOT/infra/android/build-image.sh"
+    [ "$status" -eq 0 ]
+}
+
+
 
 

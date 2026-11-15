@@ -100,18 +100,14 @@ jobs:
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684  # ratchet:actions/cache@v4
         with:
           path: /tmp/android-base/root_part
-          key: android-avf-base-arm64-${{ needs.setup.outputs.base_hash }}
-          restore-keys: |
-            android-avf-base-arm64-
+          key: android-avf-base-arm64-v2-${{ needs.setup.outputs.base_hash }}
 
       - name: Build warmed base root_part
         if: steps.cache-base.outputs.cache-hit != 'true'
         run: |
-          if [[ ! -f /tmp/android-base/root_part ]]; then
-            sudo ./infra/android/build-image.sh \
-              --base-cache /tmp/android-base/root_part \
-              --base-only
-          fi
+          sudo ./infra/android/build-image.sh \
+            --base-cache /tmp/android-base/root_part \
+            --base-only
 
   image:
     needs: [setup, base]
@@ -131,9 +127,9 @@ jobs:
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684  # ratchet:actions/cache@v4
         with:
           path: /tmp/android-base/root_part
-          key: android-avf-base-arm64-${{ needs.setup.outputs.base_hash }}
+          key: android-avf-base-arm64-v2-${{ needs.setup.outputs.base_hash }}
           restore-keys: |
-            android-avf-base-arm64-
+            android-avf-base-arm64-v2-
 
       - name: Setup SSH key
         env:
@@ -170,8 +166,21 @@ jobs:
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --generate-notes
           fi
-          gh release upload "$TAG" "android-${{ matrix.config }}-images.tar.gz" --clobber
+          upload_asset() {
+            local file="$1"
+            local size
+            size=$(stat -c '%s' "$file")
+            if (( size < 2147483648 )); then
+              gh release upload "$TAG" "$file" --clobber
+            else
+              echo "::warning::$file ($size bytes) exceeds GitHub Release 2 GiB single-file limit; uploading split parts"
+              split -b 1900m -d -a 2 "$file" "${file}.part-"
+              gh release upload "$TAG" "${file}.part-"* --clobber
+              rm -f "${file}.part-"*
+            fi
+          }
+          upload_asset "android-${{ matrix.config }}-images.tar.gz"
           if [[ "${{ matrix.config }}" == "default" ]]; then
             cp -f "android-default-images.tar.gz" "images.tar.gz"
-            gh release upload "$TAG" "images.tar.gz" --clobber
+            upload_asset "images.tar.gz"
           fi

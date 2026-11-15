@@ -65,9 +65,9 @@ package_android_archive() {
         cd "$archive_dir"
         if tar --version 2>/dev/null | grep -q "GNU tar"; then
             if command -v pigz >/dev/null 2>&1; then
-                tar --use-compress-program=pigz -cSf "$output_abs" -- *
+                tar --use-compress-program="pigz -9" -cSf "$output_abs" -- *
             else
-                tar -czSf "$output_abs" -- *
+                GZIP=-9 tar -czSf "$output_abs" -- *
             fi
         else
             tar -czf "$output_abs" -- *
@@ -158,6 +158,7 @@ mkdir -p "$ARCHIVE_DIR" "$MOUNT_DIR"
 
 cleanup_mounts() {
     set +e
+    if mountpoint -q "$MOUNT_DIR/tmp" 2>/dev/null; then umount -lf "$MOUNT_DIR/tmp"; fi
     if mountpoint -q "$MOUNT_DIR/dev/shm" 2>/dev/null; then umount -lf "$MOUNT_DIR/dev/shm"; fi
     if mountpoint -q "$MOUNT_DIR/dev/pts" 2>/dev/null; then umount -lf "$MOUNT_DIR/dev/pts"; fi
     if mountpoint -q "$MOUNT_DIR/dev" 2>/dev/null; then umount -lf "$MOUNT_DIR/dev"; fi
@@ -178,14 +179,15 @@ fi
 rm -f "$WORK_DIR/upstream-images.tar.gz"
 
 mount_chroot() {
-    mount -o loop "$ARCHIVE_DIR/root_part" "$MOUNT_DIR"
+    mount -o loop,discard "$ARCHIVE_DIR/root_part" "$MOUNT_DIR"
     mount -t proc /proc "$MOUNT_DIR/proc"
     mount -t sysfs /sys "$MOUNT_DIR/sys"
     mount --bind /dev "$MOUNT_DIR/dev"
     mount --bind /dev/pts "$MOUNT_DIR/dev/pts"
-    mkdir -p "$MOUNT_DIR/dev/shm" "$MOUNT_DIR/run/shm"
+    mkdir -p "$MOUNT_DIR/dev/shm" "$MOUNT_DIR/run/shm" "$MOUNT_DIR/tmp"
     mount -t tmpfs -o mode=1777 tmpfs "$MOUNT_DIR/dev/shm"
-    chmod 1777 "$MOUNT_DIR/dev/shm" "$MOUNT_DIR/run/shm"
+    mount -t tmpfs -o mode=1777 tmpfs "$MOUNT_DIR/tmp"
+    chmod 1777 "$MOUNT_DIR/dev/shm" "$MOUNT_DIR/run/shm" "$MOUNT_DIR/tmp"
     if [[ -L "$MOUNT_DIR/etc/resolv.conf" || -f "$MOUNT_DIR/etc/resolv.conf" ]]; then
         mv -f "$MOUNT_DIR/etc/resolv.conf" "$MOUNT_DIR/etc/resolv.conf.bak"
     fi
@@ -197,11 +199,14 @@ unmount_chroot() {
         mv -f "$MOUNT_DIR/etc/resolv.conf.bak" "$MOUNT_DIR/etc/resolv.conf"
     fi
     sync
+    umount "$MOUNT_DIR/tmp"
     umount "$MOUNT_DIR/dev/shm"
     umount "$MOUNT_DIR/dev/pts"
     umount "$MOUNT_DIR/dev"
     umount "$MOUNT_DIR/sys"
     umount "$MOUNT_DIR/proc"
+    fstrim "$MOUNT_DIR" 2>/dev/null || true
+    sync
     umount "$MOUNT_DIR"
 }
 
@@ -279,6 +284,8 @@ NETEOF
             ansible-galaxy role install geerlingguy.dotfiles
             ansible-galaxy collection install community.general
             brew install ${WARM_FORMULAE} || true
+            brew cleanup --prune=all -s || true
+            rm -rf /home/droid/.cache /home/linuxbrew/.linuxbrew/Cellar/llvm/*/lib/*.a
         '
         apt-get clean
     "
@@ -336,16 +343,28 @@ chroot "$MOUNT_DIR" /bin/bash -c "
         /home/droid/env-setup/scripts/env-setup 07-cloud
         /home/droid/env-setup/scripts/env-setup 08-prefs
         git config --global --unset-all url.\"https://github.com/\".insteadOf || true
+        brew cleanup --prune=all -s || true
     '
-    rm -f /home/droid/.ssh/id_rsa
+    rm -rf \
+        /home/droid/.ssh/id_rsa \
+        /home/droid/.cache \
+        /home/droid/.npm \
+        /home/droid/.composer/cache \
+        /home/droid/.cargo/registry \
+        /home/droid/.cargo/git \
+        /home/droid/go/pkg/mod/cache \
+        /home/linuxbrew/.linuxbrew/lib/ruby/gems/*/cache \
+        /home/linuxbrew/.linuxbrew/Cellar/llvm/*/lib/*.a \
+        /root/.cache \
+        /var/cache/apt/archives/*.deb \
+        /var/lib/apt/lists/*
     apt-get clean
-    rm -rf /var/lib/apt/lists/*
 "
 
 unmount_chroot
 
 echo -e "\n${C_HIL}4. Shrinking ext4 root_part and packaging sparse images.tar.gz...${C_RES}"
-e2fsck -f -y "$ARCHIVE_DIR/root_part" || true
+e2fsck -f -y -E discard "$ARCHIVE_DIR/root_part" || true
 resize2fs -M "$ARCHIVE_DIR/root_part"
 
 # Add 512MB free headroom so the booted VM has immediate writable space before ballooning
@@ -354,6 +373,7 @@ BLOCK_SIZE=$(dumpe2fs -h "$ARCHIVE_DIR/root_part" 2>/dev/null | awk -F: '/Block 
 FINAL_BYTES=$(( BLOCK_COUNT * BLOCK_SIZE + 536870912 ))
 truncate -s "$FINAL_BYTES" "$ARCHIVE_DIR/root_part"
 resize2fs "$ARCHIVE_DIR/root_part"
+e2fsck -f -y -E discard "$ARCHIVE_DIR/root_part" || true
 
 package_android_archive "$ARCHIVE_DIR" "$OUTPUT_PATH"
 echo -e "${C_SUC}Created Android AVF archive: ${OUTPUT_PATH}${C_RES}"
