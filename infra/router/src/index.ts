@@ -1,6 +1,12 @@
 import { Hono } from 'hono'
 
-const app = new Hono()
+type Bindings = {
+  INIT_SCRIPT?: string
+  GITHUB_ORG?: string
+  GITHUB_TOKEN?: string
+}
+
+const app = new Hono<{ Bindings: Bindings }>()
 const base = 'env-setup'
 
 
